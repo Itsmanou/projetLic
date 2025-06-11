@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/* Variables de couleurs en mode clair */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* Polices */
+  --font-sans: var(--font-inter); /* ✅ Utilisation d'Inter */
+  --font-mono: var(--font-geist-mono); /* Toujours Geist Mono pour le code */
+}
+
+/* Variables en mode sombre */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+/* Définition de thème avec les variables */
+:root {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter); /* Répété ici pour cohérence */
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Application globale */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code,
+pre {
+  font-family: var(--font-mono), monospace;
+}
