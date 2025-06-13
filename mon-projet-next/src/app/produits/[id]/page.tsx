@@ -1,152 +1,455 @@
 'use client';
+
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePanier } from '@/app/context/PanierContext';
-import { FaStar } from 'react-icons/fa';
-import { MdDescription } from 'react-icons/md';
+import { 
+  FaStar, 
+  FaShoppingCart, 
+  FaArrowLeft, 
+  FaExclamationTriangle, 
+  FaCheck,
+  FaShieldAlt,
+  FaTruck,
+  FaPhoneAlt,
+  FaHeart,
+  FaShare
+} from 'react-icons/fa';
 import { motion } from "framer-motion";
+import { useEffect, useState } from 'react';
+import { toast, ToastContainer } from 'react-toastify';
+import "react-toastify/dist/ReactToastify.css";
 
-const produits = [
-	{
-		id: 1,
-		nom: 'Paracétamol 500mg',
-		prix: 1200,
-		image: '/produits.13.jpeg',
-		rating: 4,
-		description: 'Soulage la douleur et fait baisser la fièvre.',
-	},
-	{
-		id: 2,
-		nom: 'Vitamine C 1000mg',
-		prix: 1500,
-		image: '/produits.14.jpg',
-		rating: 5,
-		description: 'Renforce le système immunitaire.',
-	},
-	{
-		id: 3,
-		nom: 'Gel hydroalcoolique',
-		prix: 1000,
-		image: '/gelhydro.avif',
-		rating: 3,
-		description: 'Nettoie les mains sans eau.',
-	},
-	{ id: 4, nom: "Doliprane", prix: 2000, image: "/produits.12.jpg", rating: 4,Description: 'Agit au niveau du système nerveux central pour bloquer les messages de douleur et abaisser la température corporelle.' },
-	{ id: 5, nom: "Ibuprofène", prix: 2500, image: "/produits8.png", rating: 4, Description: "Inhibe les enzymes COX impliquées dans la production des prostaglandines (molécules de l'inflammation et de la douleur)." },
-	{ id: 6, nom: "La Croix Rouge", prix: 5000, image: "/produits.15.jpg", rating: 1, Description:"Secours d'urgence (catastrophes, guerres)" },
-];
+// Product interface matching backend
+interface Product {
+  _id: string;
+  name: string;
+  price: number;
+  imageUrl: string;
+  description: string;
+  category?: string;
+  stock: number;
+  rating?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Product type for cart context
+interface ProductToAdd {
+  id: string;
+  name: string;
+  price: number;
+  imageUrl: string;
+  quantity?: number;
+}
 
 export default function ProduitDetail() {
-	const { id } = useParams();
-	const { ajouterAuPanier } = usePanier();
+  const { id } = useParams();
+  const { ajouterAuPanier } = usePanier();
+  const [produit, setProduit] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [imageError, setImageError] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+  const [isFavorite, setIsFavorite] = useState(false);
 
-	const produit = produits.find((p) => p.id === Number(id));
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        
+        const response = await fetch(`/api/products/${id}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-	if (!produit) {
-		return <p className="text-center mt-10 text-red-500">Produit non trouvé.</p>;
-	}
+        if (!response.ok) {
+          throw new Error('Produit non trouvé');
+        }
 
-	return (
-		<div className="min-h-screen bg-gradient-to-br from-sky-100 via-white to-blue-100 py-10 px-4 flex items-center justify-center">
-			<motion.div
-				initial={{ opacity: 0, scale: 0.95, y: 40 }}
-				animate={{ opacity: 1, scale: 1, y: 0 }}
-				transition={{ duration: 0.7, ease: "easeOut" }}
-				className="max-w-3xl w-full bg-white shadow-2xl p-0 overflow-hidden relative"
-			>
-				{/* Floating gradient blob */}
-				<motion.div
-					className="absolute -top-20 -left-20 w-72 h-72 bg-gradient-to-br from-sky-400/30 via-blue-400/20 to-sky-600/10 blur-3xl z-0"
-					animate={{ scale: [1, 1.2, 1], rotate: [0, 30, 0] }}
-					transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-				/>
-				{/* Back link */}
-				<div className="px-8 pt-8 relative z-10">
-					<Link
-						href="/produits"
-						className="text-blue-600 hover:text-blue-800 font-semibold inline-block mb-4 transition-colors"
-					>
-						← Retour aux produits
-					</Link>
-				</div>
-				<div className="flex flex-col md:flex-row gap-10 px-8 pb-8 pt-2 relative z-10">
-					{/* Image with animated border */}
-					<motion.div
-						className="relative w-full md:w-1/2 h-72 overflow-hidden shadow-lg"
-						whileHover={{ scale: 1.04, rotate: 2 }}
-						transition={{ duration: 0.4 }}
-					>
-						<Image
-							src={produit.image}
-							alt={produit.nom}
-							fill
-							className="object-cover"
-							priority
-						/>
-						<motion.div
-							className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"
-							animate={{ opacity: [0.3, 0.5, 0.3] }}
-							transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-						/>
-					</motion.div>
-					{/* Details */}
-					<div className="md:w-1/2 flex flex-col justify-center">
-						<motion.h1
-							className="text-3xl font-extrabold text-gray-800 mb-2 tracking-tight"
-							initial={{ opacity: 0, y: 20 }}
-							animate={{ opacity: 1, y: 0 }}
-							transition={{ delay: 0.2, duration: 0.6 }}
-						>
-							{produit.nom}
-						</motion.h1>
-						<motion.p
-							className="text-2xl font-bold text-sky-600 mb-3"
-							initial={{ opacity: 0, y: 10 }}
-							animate={{ opacity: 1, y: 0 }}
-							transition={{ delay: 0.3, duration: 0.5 }}
-						>
-							{produit.prix} FCFA
-						</motion.p>
-						<div className="flex items-center mb-4">
-							{Array.from({ length: 5 }).map((_, i) => (
-								<motion.span
-									key={i}
-									initial={{ scale: 0.8, opacity: 0.5 }}
-									animate={{
-										scale: i < produit.rating ? 1.2 : 1,
-										opacity: 1,
-										color: i < produit.rating ? "#facc15" : "#d1d5db"
-									}}
-									transition={{ delay: 0.4 + i * 0.08, duration: 0.3 }}
-								>
-									<FaStar className={i < produit.rating ? "text-yellow-400" : "text-gray-300"} />
-								</motion.span>
-							))}
-						</div>
-						<motion.p
-							className="text-gray-600 text-base mb-8"
-							initial={{ opacity: 0, y: 10 }}
-							animate={{ opacity: 1, y: 0 }}
-							transition={{ delay: 0.5, duration: 0.5 }}
-						>
-							{produit.description || produit.Description}
-						</motion.p>
-						<motion.button
-							onClick={() => ajouterAuPanier(produit)}
-							whileHover={{
-								scale: 1.05,
-								background: "linear-gradient(to right, #0ea5e9, #2563eb)",
-								boxShadow: "0 8px 32px 0 rgba(14, 165, 233, 0.25)"
-							}}
-							whileTap={{ scale: 0.97 }}
-							className="w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white px-6 py-3 font-bold shadow transition-all duration-300 hover:from-sky-400 hover:to-blue-500"
-						>
-							Ajouter au panier
-						</motion.button>
-					</div>
-				</div>
-			</motion.div>
-		</div>
-	);
+        const data = await response.json();
+        
+        if (data.success) {
+          setProduit(data.data);
+        } else {
+          throw new Error(data.error || 'Erreur lors du chargement du produit');
+        }
+      } catch (err: any) {
+        console.error('Failed to fetch product:', err);
+        setError(err.message || 'Impossible de charger le produit');
+        toast.error('Erreur lors du chargement du produit');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchProduct();
+    }
+  }, [id]);
+
+  const handleAddToCart = () => {
+    if (!produit) return;
+    
+    if (produit.stock <= 0) {
+      toast.error('Ce produit n\'est plus en stock');
+      return;
+    }
+
+    if (quantity > produit.stock) {
+      toast.error(`Seulement ${produit.stock} articles disponibles en stock`);
+      return;
+    }
+
+    const productToAdd: ProductToAdd = {
+      id: produit._id,
+      name: produit.name,
+      price: produit.price,
+      imageUrl: produit.imageUrl,
+      quantity: quantity,
+    };
+    
+    ajouterAuPanier(productToAdd);
+    toast.success(`${quantity} x ${produit.name} ajouté${quantity > 1 ? 's' : ''} au panier!`);
+  };
+
+  const handleQuantityChange = (newQuantity: number) => {
+    if (newQuantity < 1) return;
+    if (produit && newQuantity > produit.stock) {
+      toast.warning(`Seulement ${produit.stock} articles disponibles`);
+      return;
+    }
+    setQuantity(newQuantity);
+  };
+
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: produit?.name,
+        text: `Découvrez ${produit?.name} sur PharmaShop`,
+        url: window.location.href,
+      });
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      toast.success('Lien copié dans le presse-papiers!');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Chargement du produit...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !produit) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <FaExclamationTriangle className="text-3xl text-red-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Produit non trouvé</h1>
+          <p className="text-gray-600 mb-8">{error || 'Le produit que vous recherchez n\'existe pas ou n\'est plus disponible.'}</p>
+          <Link
+            href="/produits"
+            className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 hover:bg-blue-700 transition-colors shadow-lg"
+          >
+            <FaArrowLeft />
+            Retour aux produits
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const rating = produit.rating || 4;
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      
+      {/* Breadcrumb Navigation */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <nav className="flex items-center gap-2 text-sm">
+            <Link href="/" className="text-gray-500 hover:text-gray-700">Accueil</Link>
+            <span className="text-gray-400">/</span>
+            <Link href="/produits" className="text-gray-500 hover:text-gray-700">Produits</Link>
+            <span className="text-gray-400">/</span>
+            <span className="text-gray-900 font-medium">{produit.name}</span>
+          </nav>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back Button */}
+        <Link
+          href="/produits"
+          className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium mb-8 transition-colors"
+        >
+          <FaArrowLeft />
+          Retour aux produits
+        </Link>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          
+          {/* Product Image Section */}
+          <div className="space-y-6">
+            <div className="relative">
+              <div className="aspect-square bg-white shadow-xl overflow-hidden border border-gray-100">
+                <motion.img
+                  src={imageError ? '/placeholder-product.jpg' : produit.imageUrl}
+                  alt={produit.name}
+                  className="w-full h-full object-cover"
+                  onError={() => setImageError(true)}
+                  whileHover={{ scale: 1.05 }}
+                  transition={{ duration: 0.3 }}
+                />
+                
+                {/* Stock Status Badge */}
+                <div className="absolute top-4 left-4">
+                  {produit.stock > 0 ? (
+                    <div className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                      <FaCheck className="text-xs" />
+                      En stock
+                    </div>
+                  ) : (
+                    <div className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                      Rupture de stock
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Trust Badges */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-white p-4 text-center border border-gray-200">
+                <FaShieldAlt className="text-green-500 text-2xl mx-auto mb-2" />
+                <p className="text-sm font-medium text-gray-900">Produit Certifié</p>
+                <p className="text-xs text-gray-600">Qualité garantie</p>
+              </div>
+              <div className="bg-white p-4 text-center border border-gray-200">
+                <FaTruck className="text-blue-500 text-2xl mx-auto mb-2" />
+                <p className="text-sm font-medium text-gray-900">Livraison Rapide</p>
+                <p className="text-xs text-gray-600">24-48h</p>
+              </div>
+              <div className="bg-white p-4 text-center border border-gray-200">
+                <FaPhoneAlt className="text-purple-500 text-2xl mx-auto mb-2" />
+                <p className="text-sm font-medium text-gray-900">Support 24/7</p>
+                <p className="text-xs text-gray-600">Assistance</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Product Details Section */}
+          <div className="space-y-8">
+            {/* Product Header */}
+            <div>
+              {produit.category && (
+                <div className="mb-3">
+                  <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                    {produit.category}
+                  </span>
+                </div>
+              )}
+              
+              <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+                {produit.name}
+              </h1>
+
+              {/* Rating */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="flex items-center">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <FaStar
+                      key={i}
+                      className={`text-lg ${i < rating ? "text-yellow-400" : "text-gray-300"}`}
+                    />
+                  ))}
+                </div>
+                <span className="text-gray-600">({rating}/5 • 127 avis)</span>
+              </div>
+
+              {/* Price */}
+              <div className="flex items-baseline gap-4 mb-6">
+                <span className="text-4xl font-bold text-blue-600">
+                  {produit.price.toLocaleString()} FCFA
+                </span>
+                <span className="text-lg text-gray-500 line-through">
+                  {(produit.price * 1.2).toLocaleString()} FCFA
+                </span>
+                <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-sm font-medium">
+                  -17%
+                </span>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
+              <p className="text-gray-700 leading-relaxed">
+                {produit.description}
+              </p>
+            </div>
+
+            {/* Stock Info */}
+            <div className="bg-gray-100 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-medium text-gray-900">Disponibilité</span>
+                <span className={`font-semibold ${
+                  produit.stock > 10 ? 'text-green-600' : 
+                  produit.stock > 0 ? 'text-orange-600' : 'text-red-600'
+                }`}>
+                  {produit.stock > 0 ? `${produit.stock} en stock` : 'Rupture de stock'}
+                </span>
+              </div>
+              
+              {produit.stock > 0 && produit.stock <= 10 && (
+                <div className="flex items-center gap-2 text-orange-600">
+                  <FaExclamationTriangle />
+                  <span className="text-sm">Stock limité - Commandez rapidement!</span>
+                </div>
+              )}
+            </div>
+
+            {/* Quantity Selector & Add to Cart */}
+            {produit.stock > 0 && (
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-3">
+                    Quantité
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center border border-gray-300">
+                      <button
+                        onClick={() => handleQuantityChange(quantity - 1)}
+                        className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-colors"
+                        disabled={quantity <= 1}
+                      >
+                        -
+                      </button>
+                      <span className="px-4 py-2 text-lg font-semibold border-x border-gray-300 text-black">
+                        {quantity}
+                      </span>
+                      <button
+                        onClick={() => handleQuantityChange(quantity + 1)}
+                        className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-colors"
+                        disabled={quantity >= produit.stock}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="text-gray-600">
+                      (Max: {produit.stock} disponibles)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Price Total */}
+                {quantity > 1 && (
+                  <div className="bg-blue-50 border border-blue-200 p-4">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-gray-900">
+                        Total ({quantity} articles)
+                      </span>
+                      <span className="text-2xl font-bold text-blue-600">
+                        {(produit.price * quantity).toLocaleString()} FCFA
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add to Cart Button */}
+                <button
+                  onClick={handleAddToCart}
+                  className="w-full bg-blue-600 text-white py-4 px-8 font-semibold text-lg hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                >
+                  <FaShoppingCart />
+                  Ajouter au panier
+                </button>
+              </div>
+            )}
+
+            {/* Out of Stock */}
+            {produit.stock === 0 && (
+              <div className="text-center py-8">
+                <div className="bg-red-50 border border-red-200 p-6">
+                  <FaExclamationTriangle className="text-red-500 text-3xl mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-red-800 mb-2">Produit Indisponible</h3>
+                  <p className="text-red-600 mb-4">Ce produit est actuellement en rupture de stock.</p>
+                  <button className="bg-red-600 text-white px-6 py-2 hover:bg-red-700 transition-colors">
+                    Me notifier quand disponible
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Product Specifications */}
+            <div className="border-t border-gray-200 pt-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Informations produit</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Référence</span>
+                  <span className="font-medium text-gray-900">{produit._id.slice(-8)}</span>
+                </div>
+                {produit.category && (
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-gray-600">Catégorie</span>
+                    <span className="font-medium text-gray-900">{produit.category}</span>
+                  </div>
+                )}
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Stock</span>
+                  <span className="font-medium text-gray-900">{produit.stock} unités</span>
+                </div>
+                {produit.createdAt && (
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-gray-600">Ajouté le</span>
+                    <span className="font-medium text-gray-900">
+                      {new Date(produit.createdAt).toLocaleDateString('fr-FR')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Contact Section */}
+        <div className="mt-16 bg-gradient-to-r from-blue-600 to-indigo-700 p-8 text-white">
+          <div className="text-center">
+            <h3 className="text-2xl font-bold mb-4">Besoin d'aide ou de conseils ?</h3>
+            <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
+              Notre équipe de pharmaciens qualifiés est disponible pour répondre à vos questions 
+              et vous conseiller sur l'utilisation de nos produits.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <a 
+                href="tel:+237659556885"
+                className="inline-flex items-center gap-2 bg-white text-blue-600 px-6 py-3 font-semibold hover:bg-blue-50 transition-colors"
+              >
+                <FaPhoneAlt />
+                Appeler maintenant
+              </a>
+              <Link 
+                href="/contact"
+                className="inline-flex items-center gap-2 border-2 border-white text-white px-6 py-3 font-semibold hover:bg-white hover:text-blue-600 transition-colors"
+              >
+                Nous contacter
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

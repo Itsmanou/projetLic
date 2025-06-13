@@ -5,62 +5,226 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePanier } from "@/app/context/PanierContext";
-import { FaShoppingCart, FaUserCircle } from "react-icons/fa"; // ✅ Ajout de l'icône login admin
+import { FaShoppingCart, FaUserCircle, FaBars, FaTimes, FaSearch } from "react-icons/fa";
 
 export default function Navbar() {
-  const { panier } = usePanier();
+  const { panier, isLoading } = usePanier();
   const [recherche, setRecherche] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
 
   const handleRecherche = (e: React.FormEvent) => {
     e.preventDefault();
     if (recherche.trim()) {
       router.push(`/recherche?query=${encodeURIComponent(recherche.trim())}`);
-      setRecherche(""); // optionnel : vider le champ
+      setRecherche("");
+      setMobileMenuOpen(false); // Close mobile menu after search
     }
   };
 
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+  };
+
+  // Cart count with loading state
+  const cartCount = isLoading ? 0 : panier.length;
+  const showCartBadge = !isLoading && panier.length > 0;
+
   return (
-    <header className="bg-black text-white p-4 sm:p-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-      <div className="flex items-center space-x-3 hover:scale-105 transform transition">
-        <Image src="/logo.jpg" alt="Logo PharmaShop" width={40} height={40} />
-        <Link href="/" className="text-2xl font-bold text-white">PharmaShop</Link>
-      </div>
-
-      <nav className="flex flex-wrap items-center gap-4 text-sm sm:text-base">
-        <Link href="/apropos" className="hover:underline">À propos</Link>
-        <Link href="/produits" className="hover:underline">Produits</Link>
-        <Link href="/contact" className="hover:underline">Contact</Link>
-      </nav>
-
-      <div className="flex items-center gap-4">
-        <form onSubmit={handleRecherche} className="flex border rounded overflow-hidden">
-          <input
-            type="text"
-            value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
-            placeholder="Rechercher..."
-            className="px-2 py-1 text-black bg-white focus:outline-none"
-          />
-          <button type="submit" className="bg-blue text-black px-2">🔍</button>
-        </form>
-
-        {/* ✅ Panier et Icône de connexion admin à droite */}
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Link href="/panier" className="text-2xl">
-              <FaShoppingCart />
+    <header className="bg-black text-white shadow-lg sticky top-0 z-50">
+      {/* Main navbar container */}
+      <div className="container mx-auto px-4">
+        {/* Desktop and mobile header */}
+        <div className="flex items-center justify-between h-16 lg:h-20">
+          {/* Logo section */}
+          <div className="flex items-center space-x-3 hover:scale-105 transform transition-transform duration-200">
+            <Image 
+              src="/logo.jpg" 
+              alt="Logo PharmaShop" 
+              width={40} 
+              height={40} 
+              className="rounded-full"
+            />
+            <Link href="/" className="text-xl lg:text-2xl font-bold text-white">
+              PharmaShop
             </Link>
-            {panier.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-600 text-xs w-5 h-5 flex items-center justify-center rounded-full">
-                {panier.length}
-              </span>
-            )}
           </div>
 
-          <Link href="/dashboard/adminlogin" className="text-white text-2xl hover:text-gray-400">
-            <FaUserCircle />
-          </Link>
+          {/* Desktop navigation */}
+          <nav className="hidden lg:flex items-center space-x-8">
+            <Link 
+              href="/apropos" 
+              className="text-white hover:text-blue-400 transition-colors duration-200 font-medium"
+            >
+              À propos
+            </Link>
+            <Link 
+              href="/produits" 
+              className="text-white hover:text-blue-400 transition-colors duration-200 font-medium"
+            >
+              Produits
+            </Link>
+            <Link 
+              href="/contact" 
+              className="text-white hover:text-blue-400 transition-colors duration-200 font-medium"
+            >
+              Contact
+            </Link>
+          </nav>
+
+          {/* Desktop search and icons */}
+          <div className="hidden lg:flex items-center space-x-4">
+            {/* Search form */}
+            <form onSubmit={handleRecherche} className="flex items-center">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={recherche}
+                  onChange={(e) => setRecherche(e.target.value)}
+                  placeholder="Rechercher..."
+                  className="w-64 px-4 py-2 pr-12 text-black bg-white rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                />
+                <button 
+                  type="submit" 
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-blue-600 transition-colors duration-200"
+                >
+                  <FaSearch className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+
+            {/* Cart and user icons */}
+            <div className="flex items-center space-x-4">
+              {/* Cart */}
+              <div className="relative">
+                <Link 
+                  href="/panier" 
+                  className="text-white hover:text-blue-400 transition-colors duration-200"
+                >
+                  <FaShoppingCart className="w-6 h-6" />
+                </Link>
+                {showCartBadge && (
+                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full font-bold">
+                    {cartCount}
+                  </span>
+                )}
+                {isLoading && (
+                  <span className="absolute -top-2 -right-2 bg-gray-400 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                    <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                  </span>
+                )}
+              </div>
+
+              {/* Admin login */}
+              <Link 
+                href="/login" 
+                className="text-white hover:text-blue-400 transition-colors duration-200"
+              >
+                <FaUserCircle className="w-6 h-6" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Mobile menu button and icons */}
+          <div className="lg:hidden flex items-center space-x-4">
+            {/* Mobile cart */}
+            <div className="relative">
+              <Link 
+                href="/panier" 
+                className="text-white hover:text-blue-400 transition-colors duration-200"
+              >
+                <FaShoppingCart className="w-5 h-5" />
+              </Link>
+              {showCartBadge && (
+                <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full font-bold text-[10px]">
+                  {cartCount}
+                </span>
+              )}
+              {isLoading && (
+                <span className="absolute -top-2 -right-2 bg-gray-400 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
+                </span>
+              )}
+            </div>
+
+            {/* Mobile admin login */}
+            <Link 
+              href="/login" 
+              className="text-white hover:text-blue-400 transition-colors duration-200"
+            >
+              <FaUserCircle className="w-5 h-5" />
+            </Link>
+
+            {/* Mobile menu toggle */}
+            <button
+              onClick={toggleMobileMenu}
+              className="text-white hover:text-blue-400 transition-colors duration-200 p-1"
+              aria-label="Toggle mobile menu"
+            >
+              {mobileMenuOpen ? (
+                <FaTimes className="w-5 h-5" />
+              ) : (
+                <FaBars className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile menu */}
+        <div className={`lg:hidden transition-all duration-300 ease-in-out ${
+          mobileMenuOpen 
+            ? 'max-h-96 opacity-100 visible' 
+            : 'max-h-0 opacity-0 invisible overflow-hidden'
+        }`}>
+          <div className="py-4 space-y-4 border-t border-gray-700">
+            {/* Mobile search */}
+            <form onSubmit={handleRecherche} className="px-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={recherche}
+                  onChange={(e) => setRecherche(e.target.value)}
+                  placeholder="Rechercher..."
+                  className="w-full px-4 py-2 pr-12 text-black bg-white rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button 
+                  type="submit" 
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-blue-600"
+                >
+                  <FaSearch className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+
+            {/* Mobile navigation links */}
+            <nav className="flex flex-col space-y-2 px-2">
+              <Link 
+                href="/apropos" 
+                onClick={closeMobileMenu}
+                className="text-white hover:text-blue-400 transition-colors duration-200 py-2 px-2 rounded hover:bg-gray-800"
+              >
+                À propos
+              </Link>
+              <Link 
+                href="/produits" 
+                onClick={closeMobileMenu}
+                className="text-white hover:text-blue-400 transition-colors duration-200 py-2 px-2 rounded hover:bg-gray-800"
+              >
+                Produits
+              </Link>
+              <Link 
+                href="/contact" 
+                onClick={closeMobileMenu}
+                className="text-white hover:text-blue-400 transition-colors duration-200 py-2 px-2 rounded hover:bg-gray-800"
+              >
+                Contact
+              </Link>
+            </nav>
+          </div>
         </div>
       </div>
     </header>
