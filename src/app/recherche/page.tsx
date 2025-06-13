@@ -184,7 +184,7 @@ export default function PageRecherche() {
 
   return (
     <div className="min-h-screen bg-gray-100 py-10 px-4">
-      <ToastContainer position="top-right" />
+     
       
       <div className="max-w-6xl mx-auto">
         {/* Navigation Header */}

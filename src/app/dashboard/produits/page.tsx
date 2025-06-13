@@ -350,18 +350,6 @@ export default function AllProductsPage() {
 
       <div className="flex-1 ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-4 lg:p-8 min-h-screen overflow-auto">
-        <ToastContainer 
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="light"
-        />
 
         {/* Header Section */}
         <div className="mb-8">

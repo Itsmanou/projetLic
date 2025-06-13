@@ -44,7 +44,16 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             {children}
           </main>
           <Footer />
-          <ToastContainer position="top-right" autoClose={3000} />
+          <ToastContainer
+            position="top-right"
+            autoClose={3000}
+            limit={5}
+            newestOnTop
+            closeOnClick
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+          />
         </div>
       </PanierProvider>
     </QueryClientProvider>

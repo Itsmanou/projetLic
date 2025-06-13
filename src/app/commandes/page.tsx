@@ -402,7 +402,7 @@ export default function CommandesPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 py-8 px-4">
-      <ToastContainer position="top-right" />
+     
       
       <motion.div
         className="max-w-6xl mx-auto"

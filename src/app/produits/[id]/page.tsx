@@ -175,7 +175,6 @@ export default function ProduitDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ToastContainer position="top-right" autoClose={3000} />
       
       {/* Breadcrumb Navigation */}
       <div className="bg-white border-b border-gray-200">

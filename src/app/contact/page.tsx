@@ -145,12 +145,6 @@ export default function Contact() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      <ToastContainer 
-        position="top-right" 
-        autoClose={5000} 
-        theme="colored"
-        limit={3}
-      />
 
       {/* Hero Section */}
       <motion.div 

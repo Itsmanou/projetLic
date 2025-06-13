@@ -184,7 +184,7 @@ export default function PanierPage() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.8 }}
     >
-      <ToastContainer position="top-right" />
+     
       
       <div className="max-w-6xl mx-auto">
         <motion.div

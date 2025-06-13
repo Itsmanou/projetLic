@@ -239,7 +239,7 @@ export default function HomePage() {
 
   return (
     <div className="relative min-h-screen bg-white text-gray-900 overflow-x-hidden">
-      <ToastContainer position="top-right" />
+     
       
       {/* Scroll progress bar */}
       <motion.div
