@@ -3,7 +3,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { FaStar, FaSearch, FaFilter, FaShoppingCart } from "react-icons/fa";
+import { FaStar, FaSearch, FaFilter, FaShoppingCart, FaArrowLeft, FaStore } from "react-icons/fa";
 import { usePanier } from "@/app/context/PanierContext";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -187,6 +187,23 @@ export default function PageRecherche() {
       <ToastContainer position="top-right" />
       
       <div className="max-w-6xl mx-auto">
+        {/* Navigation Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">     
+            <Link 
+              href="/produits" 
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition-colors"
+            >
+              <FaStore />
+              <span>Continuer les achats</span>
+            </Link>
+          </div>
+        </motion.div>
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -206,13 +223,13 @@ export default function PageRecherche() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-lg shadow-md p-6 mb-8"
+            className="bg-white shadow-md p-6 mb-8"
           >
             <div className="flex flex-col lg:flex-row gap-4 items-center justify-between mb-4">
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                 >
                   <FaFilter />
                   Filtres
@@ -223,7 +240,7 @@ export default function PageRecherche() {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'rating')}
-                    className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-1 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                   >
                     <option value="name">Nom</option>
                     <option value="price">Prix</option>
@@ -239,7 +256,7 @@ export default function PageRecherche() {
                 </div>
               </div>
 
-              <p className="text-gray-600">
+              <p className="text-blue-600">
                 {filteredResults.length} produit{filteredResults.length !== 1 ? 's' : ''} trouvé{filteredResults.length !== 1 ? 's' : ''}
               </p>
             </div>
@@ -262,7 +279,7 @@ export default function PageRecherche() {
                       <select
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                       >
                         <option value="">Toutes les catégories</option>
                         {categories.map(category => (
@@ -283,7 +300,7 @@ export default function PageRecherche() {
                       type="number"
                       value={priceRange.min}
                       onChange={(e) => setPriceRange(prev => ({ ...prev, min: Number(e.target.value) }))}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full p-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                       min="0"
                     />
                   </div>
@@ -296,7 +313,7 @@ export default function PageRecherche() {
                       type="number"
                       value={priceRange.max}
                       onChange={(e) => setPriceRange(prev => ({ ...prev, max: Number(e.target.value) }))}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full p-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                       min="0"
                     />
                   </div>
@@ -327,7 +344,7 @@ export default function PageRecherche() {
 
         {/* Error State */}
         {error && !loading && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 mb-4">
             <div className="flex items-center">
               <span className="text-red-500 mr-2">⚠️</span>
               <div>
@@ -343,9 +360,16 @@ export default function PageRecherche() {
           <div className="text-center py-12">
             <div className="text-6xl mb-4">🔍</div>
             <p className="text-xl text-gray-600 mb-4">Effectuez une recherche</p>
-            <p className="text-gray-500">
+            <p className="text-gray-500 mb-6">
               Utilisez la barre de recherche pour trouver des produits
             </p>
+            <Link
+              href="/produits"
+              className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 hover:bg-blue-700 transition-colors"
+            >
+              <FaStore />
+              Parcourir tous les produits
+            </Link>
           </div>
         )}
 
@@ -353,16 +377,41 @@ export default function PageRecherche() {
         {!loading && !error && query && (
           <>
             {filteredResults.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {filteredResults.map((produit, index) => (
-                  <SearchResultCard
-                    key={produit._id}
-                    produit={produit}
-                    index={index}
-                    onAddToCart={handleAddToCart}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+                  {filteredResults.map((produit, index) => (
+                    <SearchResultCard
+                      key={produit._id}
+                      produit={produit}
+                      index={index}
+                      onAddToCart={handleAddToCart}
+                    />
+                  ))}
+                </div>
+                
+                {/* Bottom Navigation */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col sm:flex-row items-center justify-center gap-4 py-8 border-t border-gray-200"
+                >
+                  <Link 
+                    href="/produits" 
+                    className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 hover:bg-blue-700 transition-colors"
+                  >
+                    <FaStore />
+                    <span>Continuer les achats</span>
+                  </Link>
+                  
+                  <Link 
+                    href="/panier" 
+                    className="flex items-center gap-2 border border-blue-600 text-blue-600 px-6 py-3 hover:bg-blue-50 transition-colors"
+                  >
+                    <FaShoppingCart />
+                    <span>Voir le panier</span>
+                  </Link>
+                </motion.div>
+              </>
             ) : (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">😞</div>
@@ -370,7 +419,7 @@ export default function PageRecherche() {
                 <p className="text-gray-500 mb-6">
                   Aucun produit ne correspond à votre recherche "{query}"
                 </p>
-                <div className="space-y-2 text-gray-500">
+                <div className="space-y-2 text-gray-500 mb-8">
                   <p>Suggestions :</p>
                   <ul className="text-sm space-y-1">
                     <li>• Vérifiez l'orthographe</li>
@@ -378,12 +427,23 @@ export default function PageRecherche() {
                     <li>• Essayez des synonymes</li>
                   </ul>
                 </div>
-                <Link
-                  href="/produits"
-                  className="inline-block mt-6 bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Voir tous les produits
-                </Link>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                  <Link
+                    href="/produits"
+                    className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 hover:bg-blue-700 transition-colors"
+                  >
+                    <FaStore />
+                    Voir tous les produits
+                  </Link>
+                  
+                  <Link
+                    href="/"
+                    className="inline-flex items-center gap-2 border border-blue-600 text-blue-600 px-6 py-3 hover:bg-blue-50 transition-colors"
+                  >
+                    <FaArrowLeft />
+                    Retour à l'accueil
+                  </Link>
+                </div>
               </div>
             )}
           </>
@@ -393,7 +453,7 @@ export default function PageRecherche() {
   );
 }
 
-// SearchResultCard component
+// SearchResultCard component (unchanged)
 interface SearchResultCardProps {
   produit: Produit;
   index: number;
@@ -414,7 +474,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ produit, index, onA
       whileHover={{ scale: 1.02, y: -5 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
-      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden"
+      className="bg-white shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden relative"
     >
       {/* Stock badge */}
       {produit.stock <= 5 && produit.stock > 0 && (
@@ -458,7 +518,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ produit, index, onA
       {/* Content */}
       <div className="p-4">
         <Link href={`/produits/${produit._id}`}>
-          <h3 className="font-bold text-lg text-gray-800 mb-2 hover:text-blue-600 transition-colors line-clamp-2">
+          <h3 className="font-bold text-lg text-black mb-2 hover:text-blue-600 transition-colors line-clamp-2">
             {produit.name}
           </h3>
         </Link>
@@ -491,7 +551,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ produit, index, onA
         <button
           onClick={() => onAddToCart(produit)}
           disabled={produit.stock === 0}
-          className={`w-full px-4 py-2 rounded-md font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
+          className={`w-full px-4 py-2 font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
             produit.stock > 0
               ? 'bg-blue-600 text-white hover:bg-blue-700'
               : 'bg-gray-400 text-gray-600 cursor-not-allowed'
