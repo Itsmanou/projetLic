@@ -1,45 +1,32 @@
-"use client"; // ✅ Ajout du client component
-
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import { useState } from "react";
-import Sidebar from "./components/Sidebar/Sidebar"; // ✅ Update the path if Sidebar is in components/Sidebar/Sidebar.tsx
-import Navbar from "./components/Navbar/Navbar";
-import Footer from "./components/Footer/Footer";
-import { PanierProvider } from "@/app/context/PanierContext";
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import ClientLayout from "./components/ClientLayout";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
-const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
 
-// ✅ Metadata (à garder séparément si nécessaire)
-// export const metadata: Metadata = {
-//   title: "PharmaShop",
-//   description: "Application de commande de produits pharmaceutiques",
-// };
+export const metadata: Metadata = {
+  title: "PharmaShop - Votre Pharmacie en ligne",
+  description: "Application de commande de produits pharmaceutiques certifiés et de qualité",
+  keywords: "pharmacie, médicaments, parapharmacie, santé, bien-être",
+  authors: [{ name: "PharmaShop Team" }],
+};
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [queryClient] = useState(() => new QueryClient());
-
+export default function RootLayout({ 
+  children 
+}: Readonly<{ 
+  children: React.ReactNode 
+}>) {
   return (
-    <html lang="fr" className={`${inter.variable} ${geistSans.variable} ${geistMono.variable}`}>
-      <body className="antialiased font-sans">
-        <QueryClientProvider client={queryClient}>
-          <PanierProvider>
-           *
-              <div className="flex-1 p-6">
-                <Navbar />
-                {children}
-                <Footer />
-                <ToastContainer />
-              </div>
-            
-          </PanierProvider>
-        </QueryClientProvider>
+    <html lang="fr" className={inter.variable} suppressHydrationWarning>
+      <head>
+        <meta name="google" content="notranslate" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
+      <body className="antialiased font-sans" suppressHydrationWarning>
+        <ClientLayout>
+          {children}
+        </ClientLayout>
       </body>
     </html>
   );
