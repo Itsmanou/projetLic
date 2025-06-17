@@ -122,15 +122,17 @@ export async function GET(req: NextRequest) {
 
   } catch (error) {
     console.error('💥 Detailed error in orders API:', error);
-    console.error('💥 Error stack:', error.stack);
+    if (error instanceof Error) {
+      console.error('💥 Error stack:', error.stack);
+    }
     
     // Return more detailed error info for debugging
     return NextResponse.json(
       { 
         success: false, 
         error: 'Failed to fetch orders',
-        details: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: typeof error === 'object' && error !== null && 'message' in error ? (error as { message: string }).message : String(error),
+        stack: process.env.NODE_ENV === 'development' && typeof error === 'object' && error !== null && 'stack' in error ? (error as { stack?: string }).stack : undefined
       },
       { status: 500 }
     );

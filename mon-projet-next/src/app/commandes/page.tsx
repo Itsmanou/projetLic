@@ -3,14 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { toast, ToastContainer } from 'react-toastify';
+import { toast } from 'react-toastify';
 import "react-toastify/dist/ReactToastify.css";
 import { 
   FaShoppingBag, 
   FaSearch, 
   FaFilter, 
   FaEye, 
-  FaDownload, 
   FaCalendarAlt,
   FaTruck,
   FaCheckCircle,
@@ -19,7 +18,6 @@ import {
   FaBox,
   FaMapMarkerAlt,
   FaPhone,
-  FaEnvelope,
   FaSync,
   FaExclamationTriangle
 } from 'react-icons/fa';
@@ -128,7 +126,6 @@ export default function CommandesPage() {
         router.push('/login');
         return;
       }
-
       await fetchOrders();
     } catch (err) {
       console.error('Auth check failed:', err);
@@ -140,7 +137,6 @@ export default function CommandesPage() {
     try {
       setLoading(true);
       setError('');
-      
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('Token d\'authentification manquant');
@@ -165,11 +161,8 @@ export default function CommandesPage() {
       }
 
       const data: OrdersResponse = await response.json();
-      
       if (data.success) {
-        // Extract orders array from the correct path
-        const ordersArray = data.data?.orders || [];
-        setOrders(ordersArray);
+        setOrders(data.data?.orders || []);
       } else {
         throw new Error('Erreur lors du chargement des commandes');
       }
@@ -177,31 +170,26 @@ export default function CommandesPage() {
       console.error('Failed to fetch orders:', err);
       setError(err.message);
       toast.error(err.message);
-      setOrders([]); // Set empty array on error
+      setOrders([]);
     } finally {
       setLoading(false);
     }
   };
 
   const applyFilters = () => {
-    // Ensure orders is always an array
     if (!Array.isArray(orders)) {
       setFilteredOrders([]);
       return;
     }
 
     let filtered = [...orders];
-
-    // Filter by status
     if (filters.status !== 'all') {
       filtered = filtered.filter(order => order.status === filters.status);
     }
 
-    // Filter by date range
     if (filters.dateRange !== 'all') {
       const now = new Date();
       const filterDate = new Date();
-      
       switch (filters.dateRange) {
         case '7days':
           filterDate.setDate(now.getDate() - 7);
@@ -213,13 +201,9 @@ export default function CommandesPage() {
           filterDate.setDate(now.getDate() - 90);
           break;
       }
-      
-      if (filters.dateRange !== 'all') {
-        filtered = filtered.filter(order => new Date(order.createdAt) >= filterDate);
-      }
+      filtered = filtered.filter(order => new Date(order.createdAt) >= filterDate);
     }
 
-    // Filter by search
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(order => 
@@ -229,9 +213,7 @@ export default function CommandesPage() {
       );
     }
 
-    // Sort by creation date (newest first)
     filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
     setFilteredOrders(filtered);
   };
 
@@ -242,7 +224,6 @@ export default function CommandesPage() {
 
   const confirmCancelOrder = async () => {
     if (!orderToCancel) return;
-
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`/api/orders/${orderToCancel}/cancel`, {
@@ -252,11 +233,7 @@ export default function CommandesPage() {
           'Content-Type': 'application/json',
         },
       });
-
-      if (!response.ok) {
-        throw new Error('Erreur lors de l\'annulation de la commande');
-      }
-
+      if (!response.ok) throw new Error('Erreur lors de l\'annulation de la commande');
       const data = await response.json();
       if (data.success) {
         toast.success('Commande annulée avec succès');
@@ -268,36 +245,6 @@ export default function CommandesPage() {
     } finally {
       setShowConfirmModal(false);
       setOrderToCancel(null);
-    }
-  };
-
-  const downloadInvoice = async (orderId: string) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/orders/${orderId}/invoice`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Erreur lors du téléchargement de la facture');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `facture-${orderId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      toast.success('Facture téléchargée avec succès');
-    } catch (err: any) {
-      toast.error(err.message);
     }
   };
 
@@ -318,58 +265,37 @@ export default function CommandesPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending':
-        return <FaClock className="text-yellow-600" />;
-      case 'confirmed':
-        return <FaCheckCircle className="text-blue-600" />;
-      case 'processing':
-        return <FaBox className="text-blue-600" />;
-      case 'shipped':
-        return <FaTruck className="text-purple-600" />;
-      case 'delivered':
-        return <FaCheckCircle className="text-green-600" />;
-      case 'cancelled':
-        return <FaTimesCircle className="text-red-600" />;
-      default:
-        return <FaClock className="text-gray-600" />;
+      case 'pending': return <FaClock className="text-yellow-600" />;
+      case 'confirmed': return <FaCheckCircle className="text-blue-600" />;
+      case 'processing': return <FaBox className="text-blue-600" />;
+      case 'shipped': return <FaTruck className="text-purple-600" />;
+      case 'delivered': return <FaCheckCircle className="text-green-600" />;
+      case 'cancelled': return <FaTimesCircle className="text-red-600" />;
+      default: return <FaClock className="text-gray-600" />;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'confirmed':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'processing':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'shipped':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'delivered':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'confirmed': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'shipped': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
+      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const translateStatus = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'En attente';
-      case 'confirmed':
-        return 'Confirmée';
-      case 'processing':
-        return 'En traitement';
-      case 'shipped':
-        return 'Expédié';
-      case 'delivered':
-        return 'Livré';
-      case 'cancelled':
-        return 'Annulé';
-      default:
-        return status;
+      case 'pending': return 'En attente';
+      case 'confirmed': return 'Confirmée';
+      case 'processing': return 'En traitement';
+      case 'shipped': return 'Expédié';
+      case 'delivered': return 'Livré';
+      case 'cancelled': return 'Annulé';
+      default: return status;
     }
   };
 
@@ -377,7 +303,6 @@ export default function CommandesPage() {
     return order.status === 'pending' || order.status === 'confirmed';
   };
 
-  // Show loading until hydrated
   if (!hasMounted) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -389,7 +314,7 @@ export default function CommandesPage() {
     );
   }
 
-   if (loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -402,8 +327,6 @@ export default function CommandesPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 py-8 px-4">
-     
-      
       <motion.div
         className="max-w-6xl mx-auto"
         initial={{ opacity: 0 }}
@@ -421,7 +344,7 @@ export default function CommandesPage() {
             <FaShoppingBag className="text-blue-600" />
             Mes Commandes
           </h1>
-          <p className="text-gray-600">Suivez l'état de vos commandes et téléchargez vos factures</p>
+          <p className="text-gray-600">Suivez l'état de vos commandes</p>
         </motion.div>
 
         {/* Error State */}
@@ -613,15 +536,6 @@ export default function CommandesPage() {
                       <FaEye />
                       Voir détails
                     </button>
-                    
-                    <button
-                      onClick={() => downloadInvoice(order._id)}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 transition-colors"
-                    >
-                      <FaDownload />
-                      Facture
-                    </button>
-
                     {canCancelOrder(order) && (
                       <button
                         onClick={() => handleCancelOrderClick(order._id)}
@@ -730,14 +644,6 @@ export default function CommandesPage() {
 
                 {/* Modal Actions */}
                 <div className="flex gap-3 mt-6 pt-4 border-t">
-                  <button
-                    onClick={() => downloadInvoice(selectedOrder._id)}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 transition-colors"
-                  >
-                    <FaDownload />
-                    Télécharger la facture
-                  </button>
-                  
                   {canCancelOrder(selectedOrder) && (
                     <button
                       onClick={() => handleCancelOrderClick(selectedOrder._id)}
@@ -747,7 +653,6 @@ export default function CommandesPage() {
                       Annuler la commande
                     </button>
                   )}
-                  
                   <button
                     onClick={() => setShowModal(false)}
                     className="flex-1 px-4 py-2 bg-gray-600 text-white hover:bg-gray-700 transition-colors"
@@ -760,7 +665,7 @@ export default function CommandesPage() {
           </div>
         )}
 
-        {/* Clean Confirmation Modal */}
+        {/* Cancel Confirmation Modal */}
         {showConfirmModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
             <motion.div
@@ -770,7 +675,6 @@ export default function CommandesPage() {
               exit={{ scale: 0.9, opacity: 0 }}
             >
               <div className="p-6">
-                {/* Icon and Title */}
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-12 h-12 bg-red-100 flex items-center justify-center">
                     <FaExclamationTriangle className="text-red-600 text-xl" />
@@ -784,15 +688,11 @@ export default function CommandesPage() {
                     </p>
                   </div>
                 </div>
-
-                {/* Message */}
                 <div className="mb-6">
                   <p className="text-black">
                     Êtes-vous sûr de vouloir annuler cette commande ? Une fois annulée, vous ne pourrez plus la récupérer.
                   </p>
                 </div>
-
-                {/* Actions */}
                 <div className="flex gap-3">
                   <button
                     onClick={() => {

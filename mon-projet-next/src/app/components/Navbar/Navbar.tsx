@@ -2,16 +2,27 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePanier } from "@/app/context/PanierContext";
 import { FaShoppingCart, FaUserCircle, FaBars, FaTimes, FaSearch } from "react-icons/fa";
+import { getCurrentUser, logout } from "@/utils/api";
 
 export default function Navbar() {
   const { panier, isLoading } = usePanier();
   const [recherche, setRecherche] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    setUser(getCurrentUser());
+
+    // Listen for localStorage changes (login/logout in other tabs)
+    const syncUser = () => setUser(getCurrentUser());
+    window.addEventListener("storage", syncUser);
+    return () => window.removeEventListener("storage", syncUser);
+  }, []);
 
   const handleRecherche = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +44,18 @@ export default function Navbar() {
   // Cart count with loading state
   const cartCount = isLoading ? 0 : panier.length;
   const showCartBadge = !isLoading && panier.length > 0;
+
+  // Get user's initial
+  const getUserInitial = () => {
+    if (!user || !user.name) return null;
+    return user.name.charAt(0).toUpperCase();
+  };
+
+  const handleLogout = () => {
+    logout();
+    setUser(null);
+    router.push("/");
+  };
 
   return (
     <header className="bg-black text-white shadow-lg sticky top-0 z-50">
@@ -119,13 +142,35 @@ export default function Navbar() {
                 )}
               </div>
 
-              {/* Admin login */}
-              <Link 
-                href="/login" 
-                className="text-white hover:text-blue-400 transition-colors duration-200"
-              >
-                <FaUserCircle className="w-6 h-6" />
-              </Link>
+              {/* User profile/Login */}
+              {user ? (
+                <div className="relative group">
+                  <button
+                    className="bg-blue-500 w-8 h-8 flex items-center justify-center rounded-full text-white font-bold text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title={user.name}
+                  >
+                    {getUserInitial()}
+                  </button>
+                  {/* Dropdown on hover */}
+                  <div className="absolute right-0 mt-2 w-36 bg-white text-black rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all z-50">
+                    <div className="px-4 py-2 border-b">{user.name}</div>
+                    <Link href="/profile" className="block px-4 py-2 hover:bg-gray-100">Mon profil</Link>
+                    <button
+                      onClick={handleLogout}
+                      className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                    >
+                      Déconnexion
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <Link 
+                  href="/login" 
+                  className="text-white hover:text-blue-400 transition-colors duration-200"
+                >
+                  <FaUserCircle className="w-6 h-6" />
+                </Link>
+              )}
             </div>
           </div>
 
@@ -151,13 +196,37 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* Mobile admin login */}
-            <Link 
-              href="/login" 
-              className="text-white hover:text-blue-400 transition-colors duration-200"
-            >
-              <FaUserCircle className="w-5 h-5" />
-            </Link>
+            {/* Mobile user profile/Login */}
+            {user ? (
+              <div className="relative group">
+                <button
+                  className="bg-blue-500 w-7 h-7 flex items-center justify-center rounded-full text-white font-bold text-base focus:outline-none"
+                  title={user.name}
+                >
+                  {getUserInitial()}
+                </button>
+                {/* Dropdown on click for mobile */}
+                {mobileMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-32 bg-white text-black rounded shadow-lg z-50">
+                    <div className="px-4 py-2 border-b">{user.name}</div>
+                    <Link href="/profile" className="block px-4 py-2 hover:bg-gray-100" onClick={closeMobileMenu}>Mon profil</Link>
+                    <button
+                      onClick={() => { handleLogout(); closeMobileMenu(); }}
+                      className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                    >
+                      Déconnexion
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link 
+                href="/login" 
+                className="text-white hover:text-blue-400 transition-colors duration-200"
+              >
+                <FaUserCircle className="w-5 h-5" />
+              </Link>
+            )}
 
             {/* Mobile menu toggle */}
             <button

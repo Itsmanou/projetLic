@@ -227,7 +227,11 @@ export async function PUT(req: NextRequest) {
             isCurrentPasswordValid = await bcrypt.compare(currentPassword, existingUser.password);
             console.log('🔐 Fallback bcrypt.compare result:', isCurrentPasswordValid);
           } catch (err) {
-            console.log('🔐 Fallback bcrypt.compare failed:', err.message);
+            if (err && typeof err === 'object' && 'message' in err) {
+              console.log('🔐 Fallback bcrypt.compare failed:', (err as { message: string }).message);
+            } else {
+              console.log('🔐 Fallback bcrypt.compare failed with unknown error:', err);
+            }
           }
         }
       }
@@ -296,6 +300,14 @@ export async function PUT(req: NextRequest) {
       }
     );
 
+    if (!updatedUser) {
+      console.log('❌ Updated user not found after update');
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch updated user profile' },
+        { status: 500 }
+      );
+    }
+
     console.log('✅ Profile updated successfully');
     return NextResponse.json({
       success: true,
@@ -314,12 +326,18 @@ export async function PUT(req: NextRequest) {
 
   } catch (error) {
     console.error('💥 Error updating profile:', error);
-    console.error('💥 Error stack:', error.stack);
+    if (error instanceof Error) {
+      console.error('💥 Error stack:', error.stack);
+    } else {
+      console.error('💥 Error stack: unknown error type');
+    }
     return NextResponse.json(
       { 
         success: false, 
         error: 'Failed to update profile',
-        details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+        details: process.env.NODE_ENV === 'development'
+          ? (error instanceof Error ? error.message : String(error))
+          : undefined
       },
       { status: 500 }
     );

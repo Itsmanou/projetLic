@@ -44,6 +44,7 @@ const Sidebar: React.FC = () => {
   const menuItems = [
     { icon: "🏠", label: "Accueil", path: "/dashboard" },
     { icon: "🛒", label: "Produits", path: "/dashboard/produits" },
+    { icon: "📦", label: "Commandes", path: "/dashboard/commandes" },
     { icon: "👤", label: "Utilisateurs", path: "/dashboard/utilisateurs" },
     { icon: "⚙️", label: "Paramètre", path: "/dashboard/parametre" },
   ];
@@ -174,13 +175,6 @@ const Sidebar: React.FC = () => {
           </button>
         </div>
 
-        {/* Fixed Footer - Only show when expanded */}
-        {isExpanded && (
-          <div className="p-4 text-center text-xs opacity-60 flex-shrink-0 border-t border-blue-600">
-            <p>Admin Panel v1.0</p>
-            <p className="text-blue-200 mt-1">Joedev247</p>
-          </div>
-        )}
       </div>
 
       {/* Mobile Toggle Button - Only show when sidebar is collapsed on mobile */}

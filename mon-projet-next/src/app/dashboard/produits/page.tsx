@@ -55,6 +55,10 @@ export default function AllProductsPage() {
   const [error, setError] = useState("");
   const [user, setUser] = useState<User | null>(null);
 
+  // Modal for delete confirmation
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+
   // Check authentication and admin rights
   useEffect(() => {
     const checkAuth = async () => {
@@ -163,6 +167,13 @@ export default function AllProductsPage() {
       }
 
       setSelectedFile(file);
+
+      // Important: revoke previous preview to avoid memory leaks
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+
+      // Set preview (no bug here)
       setImagePreview(URL.createObjectURL(file));
     }
   };
@@ -271,28 +282,28 @@ export default function AllProductsPage() {
     }
   };
 
-  // Delete a product
-  const handleDelete = async (id: string) => {
-    const confirmDelete = window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?");
-    if (!confirmDelete) return;
+  // Show modal, not confirm
+  const handleDelete = (id: string) => {
+    const product = products.find(p => p._id === id);
+    setProductToDelete(product || null);
+    setShowDeleteModal(true);
+  };
 
+  // Confirm from modal
+  const confirmDelete = async () => {
+    if (!productToDelete || !productToDelete._id) return;
     try {
       setLoading(true);
-      
-      const response = await fetch(`/api/products/${id}`, {
+      const response = await fetch(`/api/products/${productToDelete._id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
-
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data.error || 'Erreur lors de la suppression du produit');
       }
-
       if (data.success) {
-        // Update local state
-        setProducts(products.filter(product => product._id !== id));
+        setProducts(products.filter(product => product._id !== productToDelete._id));
         toast.success("✅ Produit supprimé avec succès !");
       } else {
         throw new Error(data.error || 'Erreur lors de la suppression du produit');
@@ -302,6 +313,8 @@ export default function AllProductsPage() {
       toast.error(err.message || "Erreur lors de la suppression du produit");
     } finally {
       setLoading(false);
+      setShowDeleteModal(false);
+      setProductToDelete(null);
     }
   };
 
@@ -329,6 +342,16 @@ export default function AllProductsPage() {
     setIsEditing(false);
   };
 
+  // Clean up blob URLs on unmount/form close (prevent memory leaks)
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+    // eslint-disable-next-line
+  }, [showForm]);
+
 
   // Get stock status
   const getStockStatus = (stock: number) => {
@@ -350,7 +373,42 @@ export default function AllProductsPage() {
 
       <div className="flex-1 ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-4 lg:p-8 min-h-screen overflow-auto">
-
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && productToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white rounded-lg p-8 shadow-2xl max-w-sm w-full">
+              <div className="flex items-center mb-4">
+                <ExclamationTriangleIcon className="h-8 w-8 text-red-600 mr-3" />
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Confirmer la suppression
+                </h3>
+              </div>
+              <p className="text-gray-700 mb-6">
+                Êtes-vous sûr de vouloir supprimer le produit <span className="font-bold">{productToDelete.name}</span> ?
+                <br />
+                Cette action est <span className="text-red-600 font-bold">irréversible</span>.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setProductToDelete(null);
+                  }}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded"
+                  disabled={loading}
+                >
+                  {loading ? "Suppression..." : "Supprimer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -423,17 +481,6 @@ export default function AllProductsPage() {
               </div>
             </div>
             
-            <div className="bg-white p-6 shadow-lg border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Stock Faible</p>
-                  <p className="text-2xl font-bold text-orange-600">{lowStockCount}</p>
-                </div>
-                <div className="p-3 bg-orange-100">
-                  <ExclamationTriangleIcon className="h-6 w-6 text-orange-600" />
-                </div>
-              </div>
-            </div>
             
             <div className="bg-white p-6 shadow-lg border border-gray-100">
               <div className="flex items-center justify-between">
@@ -484,9 +531,13 @@ export default function AllProductsPage() {
                         <img
                           src={imagePreview}
                           alt="Aperçu du produit"
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain border-2 border-blue-200"
+                          style={{ backgroundColor: "#fff" }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "/placeholder-product.jpg";
+                          }}
                         />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
                           <PhotoIcon className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                         </div>
                       </div>
