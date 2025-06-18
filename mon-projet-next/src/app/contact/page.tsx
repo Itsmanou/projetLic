@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ToastContainer, toast } from 'react-toastify';
+import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { motion } from 'framer-motion';
 import {
@@ -94,7 +94,7 @@ export default function Contact() {
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      toast.success("✅ Votre message a été envoyé avec succès ! Nous vous répondrons dans les plus brefs délais.", {
+      toast.success("Votre message a été envoyé avec succès ! Nous vous répondrons dans les plus brefs délais.", {
         icon: <>🚀</>
       });
       

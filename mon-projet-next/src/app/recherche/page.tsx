@@ -5,8 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { FaStar, FaSearch, FaFilter, FaShoppingCart, FaArrowLeft, FaStore } from "react-icons/fa";
 import { usePanier } from "@/app/context/PanierContext";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "react-toastify";
 
 // Product interface matching backend
 interface Produit {
@@ -179,7 +178,6 @@ export default function PageRecherche() {
     };
     
     ajouterAuPanier(productToAdd);
-    toast.success(`${produit.name} ajouté au panier!`);
   };
 
   return (

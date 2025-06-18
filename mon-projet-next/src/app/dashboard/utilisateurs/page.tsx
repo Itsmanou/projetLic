@@ -3,8 +3,7 @@ import Sidebar from "@/app/components/Sidebar/Sidebar";
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { FaSearch, FaTrash, FaUserEdit, FaPlus, FaEye, FaBan, FaCheck, FaUserShield } from "react-icons/fa";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "react-toastify";
 import {
   UsersIcon,
   CheckCircleIcon,

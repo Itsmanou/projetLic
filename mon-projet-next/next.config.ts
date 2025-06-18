@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  reactStrictMode: true,  // Active les vérifications strictes
+  reactStrictMode: false,  // Désactive les vérifications strictes pour éviter le double montage
   swcMinify: true,        // Active l'optimisation du code
 
   images: {

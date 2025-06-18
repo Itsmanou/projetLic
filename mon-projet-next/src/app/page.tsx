@@ -5,7 +5,7 @@ import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { usePanier } from "@/app/context/PanierContext";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { 
   FaStar, 
@@ -219,7 +219,6 @@ export default function HomePage() {
         imageUrl: product.imageUrl,
       };
       ajouterAuPanier(productToAdd);
-      toast.success(`${product.name} ajouté au panier!`);
     } catch (error) {
       console.error('Error adding to cart:', error);
       toast.error('Erreur lors de l\'ajout au panier');

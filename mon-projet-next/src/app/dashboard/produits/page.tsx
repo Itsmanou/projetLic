@@ -2,8 +2,7 @@
 
 import Sidebar from "@/app/components/Sidebar/Sidebar";
 import { useEffect, useState } from "react";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 import { 
   PlusIcon, 
@@ -836,7 +835,7 @@ export default function AllProductsPage() {
           </div>
         )}
       </div>
-    </div>
-  </div>
+        </div>
+      </div>
   );
 }

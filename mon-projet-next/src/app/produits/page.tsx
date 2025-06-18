@@ -595,7 +595,6 @@ const ProductCard: React.FC<ProductCardProps> = React.memo(({ produit, ajouterAu
     };
 
     ajouterAuPanier(productToAdd);
-    toast.success(`${produit.name} ajouté au panier!`);
   }, [produit, ajouterAuPanier]);
 
   const rating = produit.rating || 4;

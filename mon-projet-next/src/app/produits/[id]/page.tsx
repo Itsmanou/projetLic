@@ -18,8 +18,7 @@ import {
 } from 'react-icons/fa';
 import { motion } from "framer-motion";
 import { useEffect, useState } from 'react';
-import { toast, ToastContainer } from 'react-toastify';
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from 'react-toastify';
 
 // Product interface matching backend
 interface Product {
@@ -113,8 +112,8 @@ export default function ProduitDetail() {
       quantity: quantity,
     };
     
+    console.log('add to cart', productToAdd);
     ajouterAuPanier(productToAdd);
-    toast.success(`${quantity} x ${produit.name} ajouté${quantity > 1 ? 's' : ''} au panier!`);
   };
 
   const handleQuantityChange = (newQuantity: number) => {

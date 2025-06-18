@@ -43,6 +43,7 @@ export const usePanier = () => {
 
 // Provider
 export const PanierProvider = ({ children }: { children: ReactNode }) => {
+  console.log('PanierProvider mounted');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
@@ -97,7 +98,7 @@ export const PanierProvider = ({ children }: { children: ReactNode }) => {
 
       // Use setTimeout to avoid React state update during render
       setTimeout(() => {
-        toast.success(`✅ ${product.name} ajouté au panier!`, {
+        toast.success(` ${product.name} ajouté au panier!`, {
           position: "top-right",
           autoClose: 2000,
         });
