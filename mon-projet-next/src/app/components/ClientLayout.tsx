@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Navbar from "./Navbar/Navbar";
-import Footer from "./Footer/Footer";
+// import Navbar from "./Navbar/Navbar";
+// import Footer from "./Footer/Footer";
 import { PanierProvider } from "@/app/context/PanierContext";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -39,11 +39,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     <QueryClientProvider client={queryClient}>
       <PanierProvider>
         <div className="flex flex-col min-h-screen">
-          <Navbar />
+          {/* <Navbar /> */}
           <main className="flex-1">
             {children}
           </main>
-          <Footer />
+          {/* <Footer /> */}
           <ToastContainer
             position="top-right"
             autoClose={3000}

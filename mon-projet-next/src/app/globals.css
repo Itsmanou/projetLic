@@ -3,7 +3,7 @@
 /* Variables de couleurs en mode clair */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  /* --foreground: #171717; */
 
   /* Polices */
   --font-sans: var(--font-inter); /* ✅ Utilisation d'Inter */
@@ -13,7 +13,7 @@
 /* Variables en mode sombre */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    /* --background: #0a0a0a; */
     --foreground: #ededed;
   }
 }

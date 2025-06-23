@@ -2,17 +2,50 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { verifyToken, isAdmin } from '@/lib/auth';
+import cloudinary from '@/lib/cloudinary';
+
+// Helper function to upload prescription file to Cloudinary
+async function uploadPrescriptionToCloudinary(file: File, orderId: string): Promise<string> {
+  try {
+    console.log('☁️ Uploading prescription to Cloudinary...');
+
+    // Convert file to base64
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    const base64 = buffer.toString('base64');
+    const dataURI = `data:${file.type};base64,${base64}`;
+
+    // Upload to Cloudinary with prescription-specific settings
+    const result = await cloudinary.uploader.upload(dataURI, {
+      folder: 'pharmashop/prescriptions', // Organize prescriptions in their own folder
+      public_id: `prescription_${orderId}_${Date.now()}`, // Unique filename
+      transformation: [
+        { width: 1200, height: 1600, crop: 'limit' }, // Keep prescriptions readable
+        { quality: 'auto' }, // Auto optimize quality
+        { format: 'auto' } // Auto choose best format
+      ],
+      resource_type: 'auto', // Support images and PDFs
+      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'webp']
+    });
+
+    console.log('✅ Prescription uploaded successfully to Cloudinary:', result.secure_url);
+    return result.secure_url;
+  } catch (error) {
+    console.error('❌ Error uploading prescription to Cloudinary:', error);
+    throw new Error('Failed to upload prescription file');
+  }
+}
 
 // GET /api/orders - Get user's orders or all orders (admin)
 export async function GET(req: NextRequest) {
   console.log('🔍 Orders API called');
-  
+
   try {
     // Step 1: Test authentication
     console.log('🔐 Testing authentication...');
     const authResult = await verifyToken(req);
     console.log('🔐 Auth result:', { success: authResult.success, userId: authResult.user?.id });
-    
+
     if (!authResult.success || !authResult.user) {
       console.log('❌ Authentication failed:', authResult.error);
       return NextResponse.json(
@@ -20,7 +53,7 @@ export async function GET(req: NextRequest) {
         { status: 401 }
       );
     }
-    
+
     console.log('✅ Authentication successful, user ID:', authResult.user.id);
 
     // Step 2: Test database connection
@@ -32,17 +65,17 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     const status = searchParams.get('status');
-    
+
     // Step 3: Build filter with proper ObjectId handling
     console.log('🔍 Building filter...');
     let filter: any = {};
-    
+
     if (!isAdmin(authResult.user)) {
       // Handle user ID conversion safely
       try {
         const userId = authResult.user.id;
         console.log('👤 Converting user ID to ObjectId:', userId);
-        
+
         // Check if it's already a valid ObjectId string
         if (ObjectId.isValid(userId)) {
           filter.userId = new ObjectId(userId);
@@ -51,7 +84,7 @@ export async function GET(req: NextRequest) {
           console.warn('⚠️ User ID is not a valid ObjectId:', userId);
           filter.userId = userId; // Use as string if ObjectId conversion fails
         }
-        
+
         console.log('👤 User filter applied:', filter.userId);
       } catch (userIdError) {
         console.error('💥 Error converting user ID:', userIdError);
@@ -63,11 +96,11 @@ export async function GET(req: NextRequest) {
     } else {
       console.log('👑 Admin access - no user filter');
     }
-    
+
     if (status && status !== 'all') {
       filter.status = status;
     }
-    
+
     console.log('🔍 Final filter:', filter);
 
     const skip = (page - 1) * limit;
@@ -93,20 +126,62 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Step 5: Test orders query with simplified approach first
-    console.log('📋 Fetching orders (simplified query)...');
+    // Step 5: Fetch orders with user information using proper type conversion
+    console.log('📋 Fetching orders with user details...');
     const orders = await db.collection('orders')
-      .find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
+      .aggregate([
+        { $match: filter },
+        {
+          $addFields: {
+            // Convert userId to ObjectId if it's a string
+            userIdAsObjectId: {
+              $cond: {
+                if: { $eq: [{ $type: "$userId" }, "string"] },
+                then: { $toObjectId: "$userId" },
+                else: "$userId"
+              }
+            }
+          }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userIdAsObjectId',
+            foreignField: '_id',
+            as: 'userDetails'
+          }
+        },
+        {
+          $addFields: {
+            userInfo: {
+              $cond: {
+                if: { $gt: [{ $size: '$userDetails' }, 0] },
+                then: {
+                  name: { $arrayElemAt: ['$userDetails.name', 0] },
+                  email: { $arrayElemAt: ['$userDetails.email', 0] },
+                  phone: { $arrayElemAt: ['$userDetails.phone', 0] }
+                },
+                else: {
+                  name: 'Utilisateur non trouvé',
+                  email: '',
+                  phone: ''
+                }
+              }
+            }
+          }
+        },
+        { $project: { userDetails: 0, userIdAsObjectId: 0 } }, // Remove temporary fields
+        { $sort: { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limit }
+      ])
       .toArray();
 
-    console.log('📋 Orders fetched:', orders.length);
+    console.log('📋 Orders fetched with user info:', orders.length);
+    if (orders.length > 0) {
+      console.log('📋 First order user info:', orders[0].userInfo);
+    }
 
-    // Step 6: If we need user details, do a separate query (optional)
-    // For now, let's skip the complex aggregation and just return orders
-    
     return NextResponse.json({
       success: true,
       data: {
@@ -125,11 +200,10 @@ export async function GET(req: NextRequest) {
     if (error instanceof Error) {
       console.error('💥 Error stack:', error.stack);
     }
-    
-    // Return more detailed error info for debugging
+
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to fetch orders',
         details: typeof error === 'object' && error !== null && 'message' in error ? (error as { message: string }).message : String(error),
         stack: process.env.NODE_ENV === 'development' && typeof error === 'object' && error !== null && 'stack' in error ? (error as { stack?: string }).stack : undefined
@@ -139,7 +213,8 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/orders - Create new order (unchanged)
+
+// POST /api/orders - Create new order with Cloudinary prescription upload
 export async function POST(req: NextRequest) {
   try {
     const authResult = await verifyToken(req);
@@ -150,14 +225,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check if request is FormData (file upload) or JSON
+    const contentType = req.headers.get('content-type');
+    let orderData: any;
+    let prescriptionFile: File | null = null;
+
+    if (contentType?.includes('multipart/form-data')) {
+      // Handle FormData (with file upload)
+      const formData = await req.formData();
+      const orderDataString = formData.get('orderData') as string;
+
+      if (!orderDataString) {
+        return NextResponse.json(
+          { success: false, error: 'Order data is required' },
+          { status: 400 }
+        );
+      }
+
+      orderData = JSON.parse(orderDataString);
+      prescriptionFile = formData.get('prescriptionFile') as File | null;
+    } else {
+      // Handle regular JSON request (backward compatibility)
+      orderData = await req.json();
+    }
+
     const {
       items,
       shippingAddress,
       totalAmount,
       paymentMethod = 'cash_on_delivery',
-      prescriptionImages = [],
+      prescriptionData = {},
       notes = ''
-    } = await req.json();
+    } = orderData;
 
     // Validate required fields
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -177,7 +276,7 @@ export async function POST(req: NextRequest) {
 
     const requiredFields = ['fullName', 'address', 'city', 'country'];
     const missingFields = requiredFields.filter(field => !shippingAddress[field] || shippingAddress[field].trim() === '');
-    
+
     if (missingFields.length > 0) {
       return NextResponse.json(
         { success: false, error: `Complete shipping address is required. Missing: ${missingFields.join(', ')}` },
@@ -193,20 +292,44 @@ export async function POST(req: NextRequest) {
     }
 
     const { db } = await connectToDatabase();
-    
-    // Handle user ID conversion for orders
-    let userId;
+
+    // 🔧 FIXED: Handle user ID conversion for orders
+    let userId: ObjectId;
     try {
-      userId = ObjectId.isValid(authResult.user.id) 
-        ? new ObjectId(authResult.user.id) 
-        : authResult.user.id;
+      const userIdString = authResult.user.id;
+      console.log('🔍 Original user ID from auth:', userIdString);
+
+      if (!ObjectId.isValid(userIdString)) {
+        console.error('❌ Invalid user ID format:', userIdString);
+        return NextResponse.json(
+          { success: false, error: 'Invalid user ID format' },
+          { status: 400 }
+        );
+      }
+
+      userId = new ObjectId(userIdString); // Always store as ObjectId
+      console.log('✅ User ID converted to ObjectId:', userId.toString());
+
     } catch (error) {
-      console.error('Error converting user ID:', error);
+      console.error('💥 Error converting user ID:', error);
       return NextResponse.json(
         { success: false, error: 'Invalid user ID' },
         { status: 400 }
       );
     }
+
+    // 🔧 FIXED: Get user information for the order (userId is already ObjectId)
+    console.log('🔍 Looking up user with ObjectId:', userId.toString());
+    const user = await db.collection('users').findOne({ _id: userId });
+    if (!user) {
+      console.error('❌ User not found with ID:', userId.toString());
+      return NextResponse.json(
+        { success: false, error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    console.log('✅ User found:', { name: user.name, email: user.email });
 
     // Validate products and check stock
     const productIds = items.map((item: any) => new ObjectId(item.productId));
@@ -228,7 +351,7 @@ export async function POST(req: NextRequest) {
 
     for (const item of items) {
       const product = products.find(p => p._id.toString() === item.productId);
-      
+
       if (!product) {
         return NextResponse.json(
           { success: false, error: `Product ${item.productId} not found` },
@@ -261,19 +384,39 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Check prescription requirement
-    if (requiresPrescription && prescriptionImages.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Prescription images are required for prescription medicines' },
-        { status: 400 }
-      );
-    }
-
     const shippingCost = 2000;
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
+    // Prepare prescription data
+    let prescriptionInfo: any = {
+      clinicName: prescriptionData.clinicName || '',
+      prescriptionFile: null,
+      uploadedAt: null
+    };
+
+    // Handle prescription file upload to Cloudinary if present
+    if (prescriptionFile && prescriptionFile.size > 0) {
+      try {
+        console.log('📁 Processing prescription file upload to Cloudinary...');
+        const cloudinaryUrl = await uploadPrescriptionToCloudinary(prescriptionFile, orderNumber);
+        prescriptionInfo.prescriptionFile = cloudinaryUrl;
+        prescriptionInfo.uploadedAt = new Date();
+        prescriptionInfo.originalFileName = prescriptionFile.name;
+        prescriptionInfo.fileSize = prescriptionFile.size;
+        prescriptionInfo.fileType = prescriptionFile.type;
+        console.log('✅ Prescription file uploaded to Cloudinary:', cloudinaryUrl);
+      } catch (fileError) {
+        console.error('❌ Error uploading prescription file:', fileError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to upload prescription file' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // 🔧 FIXED: Create order with proper ObjectId userId
     const newOrder = {
-      userId,
+      userId, // This is now guaranteed to be an ObjectId
       orderNumber,
       items: orderItems,
       subtotal: calculatedTotal,
@@ -282,20 +425,39 @@ export async function POST(req: NextRequest) {
       status: 'pending',
       paymentMethod,
       paymentStatus: 'pending',
+      // User information (from logged-in account)
+      userInfo: {
+        name: user.name || user.email || 'Utilisateur',
+        email: user.email,
+        phone: user.phone || ''
+      },
+      // Shipping address (delivery information - "Livré à")
       shippingAddress: {
-        fullName: shippingAddress.fullName,
+        fullName: shippingAddress.fullName, // This is "Livré à"
         address: shippingAddress.address,
         city: shippingAddress.city,
         postalCode: shippingAddress.postalCode || '',
         country: shippingAddress.country,
         phone: shippingAddress.phone || ''
       },
-      prescriptionImages,
+      // Prescription information
+      prescription: prescriptionInfo,
+      prescriptionImages: [], // Keep for backward compatibility
       notes,
       requiresPrescription,
       createdAt: new Date(),
       updatedAt: new Date()
     };
+
+    console.log('💾 Creating order with data:', {
+      orderNumber,
+      userId: userId.toString(),
+      userName: user.name,
+      userEmail: user.email,
+      deliverTo: shippingAddress.fullName,
+      hasFile: !!prescriptionFile,
+      clinicName: prescriptionData.clinicName
+    });
 
     const result = await db.collection('orders').insertOne(newOrder);
 
@@ -303,17 +465,17 @@ export async function POST(req: NextRequest) {
     for (const item of items) {
       await db.collection('products').updateOne(
         { _id: new ObjectId(item.productId) },
-        { 
+        {
           $inc: { stock: -item.quantity },
           $set: { updatedAt: new Date() }
         }
       );
     }
 
-    // Clear user's cart
+    // 🔧 FIXED: Clear user's cart (userId is already ObjectId)
     try {
       await db.collection('carts').updateOne(
-        { userId },
+        { userId }, // Use ObjectId directly
         {
           $set: {
             items: [],
@@ -322,9 +484,12 @@ export async function POST(req: NextRequest) {
         },
         { upsert: true }
       );
+      console.log('✅ Cart cleared for user:', userId.toString());
     } catch (cartError) {
-      console.warn('Could not clear cart:', cartError);
+      console.warn('⚠️ Could not clear cart:', cartError);
     }
+
+    console.log('✅ Order created successfully:', orderNumber);
 
     return NextResponse.json({
       success: true,
@@ -333,7 +498,7 @@ export async function POST(req: NextRequest) {
     }, { status: 201 });
 
   } catch (error) {
-    console.error('Error creating order:', error);
+    console.error('💥 Error creating order:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to create order' },
       { status: 500 }
@@ -341,7 +506,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT method unchanged...
+// PUT /api/orders - Update order status (unchanged)
 export async function PUT(req: NextRequest) {
   try {
     const authResult = await verifyToken(req);

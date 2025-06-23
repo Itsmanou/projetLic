@@ -258,7 +258,7 @@ const RegisterPage = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.5 }}
             >
-              Hello!
+              Bienvenue !
             </motion.h2>
             <motion.p 
               className="text-gray-600"
@@ -266,7 +266,7 @@ const RegisterPage = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.5 }}
             >
-              Sign up and get started
+              Inscrivez-vous et commencez
             </motion.p>
           </div>
 
@@ -529,7 +529,7 @@ const RegisterPage = () => {
                   Inscription...
                 </span>
               ) : (
-                'Sign Up'
+                "S'inscrire"
               )}
             </motion.button>
           </form>
@@ -542,12 +542,12 @@ const RegisterPage = () => {
             transition={{ delay: 1.4, duration: 0.5 }}
           >
             <p className="text-gray-600">
-              Already have an account?{' '}
+              Vous avez déjà un compte ?{' '}
               <Link 
                 href="/login" 
                 className="text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
               >
-                Login
+                Se connecter
               </Link>
             </p>
           </motion.div>

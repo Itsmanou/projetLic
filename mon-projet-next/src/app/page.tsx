@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { motion, useScroll, useSpring, useTransform } from "framer-motion";
+import { motion, useScroll, useSpring, useTransform, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { usePanier } from "@/app/context/PanierContext";
@@ -17,8 +17,11 @@ import {
   FaUserMd,
   FaPills,
   FaChevronRight,
-  FaPlay
+  FaPlay,
+  FaChevronLeft
 } from "react-icons/fa";
+import Navbar from '@/app/components/Navbar/Navbar';
+import Footer from '@/app/components/Footer/Footer';
 
 interface Product {
   _id: string;
@@ -38,6 +41,22 @@ interface ProductToAdd {
   price: number;
   imageUrl: string;
 }
+
+// Carousel images - adjust these paths as needed
+const carouselImages = [
+  {
+    src: '/images/pharmacy-hero-1.png', // Replace with your image path
+    alt: 'Pharmacie moderne avec équipement médical'
+  },
+  {
+    src: '/images/chair side.png', // Replace with your image path
+    alt: 'Médicaments et produits pharmaceutiques'
+  },
+  {
+    src: '/images/pharmacy-hero-1.png', // Replace with your image path
+    alt: 'Consultation pharmaceutique professionnelle'
+  }
+];
 
 // Product Card Component
 interface ProductCardProps {
@@ -170,6 +189,10 @@ export default function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
+  
+  // Carousel state
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
   // Scroll animations
   const { scrollYProgress } = useScroll();
@@ -186,6 +209,17 @@ export default function HomePage() {
     setHasMounted(true);
     fetchFeaturedProducts();
   }, []);
+
+  // Auto-play carousel
+  useEffect(() => {
+    if (!isAutoPlaying) return;
+    
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % carouselImages.length);
+    }, 5000); // Change slide every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [isAutoPlaying]);
 
   const fetchFeaturedProducts = async () => {
     try {
@@ -225,6 +259,18 @@ export default function HomePage() {
     }
   };
 
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % carouselImages.length);
+  };
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + carouselImages.length) % carouselImages.length);
+  };
+
+  const goToSlide = (index: number) => {
+    setCurrentSlide(index);
+  };
+
   if (!hasMounted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
@@ -237,7 +283,9 @@ export default function HomePage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-white text-gray-900 overflow-x-hidden">
+    <>
+      <Navbar />
+      <div className="relative min-h-screen bg-white text-gray-900 overflow-x-hidden">
      
       
       {/* Scroll progress bar */}
@@ -246,19 +294,63 @@ export default function HomePage() {
         className="fixed right-0 top-0 w-1 h-full bg-gradient-to-b from-blue-600 to-blue-400 origin-top z-50"
       />
 
-      {/* Hero Section */}
+      {/* Hero Section with Carousel */}
       <motion.section 
         className="relative h-screen flex items-center justify-center overflow-hidden"
         style={{ y: heroY, opacity: heroOpacity }}
+        onMouseEnter={() => setIsAutoPlaying(false)}
+        onMouseLeave={() => setIsAutoPlaying(true)}
       >
-        {/* Background with CSS instead of Next/Image to avoid loading issues */}
-        <div 
-          className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1585435557343-3b092031d886?w=1920&h=1080&fit=crop&crop=center')`
-          }}
+        {/* Carousel Background */}
+        <div className="absolute inset-0 z-0">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentSlide}
+              initial={{ opacity: 0, scale: 1.1 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 1 }}
+              className="absolute inset-0"
+            >
+              <div 
+                className="w-full h-full bg-cover bg-center bg-no-repeat"
+                style={{
+                  backgroundImage: `url('${carouselImages[currentSlide].src}')`
+                }}
+              />
+              {/* <div className="absolute inset-0 bg-blue-600 bg-opacity-70" /> */}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Carousel Navigation */}
+        <button
+          onClick={prevSlide}
+          className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white p-3 rounded-full transition-all duration-300"
         >
-          <div className="absolute inset-0 bg-blue-600" />
+          <FaChevronLeft className="text-xl" />
+        </button>
+
+        <button
+          onClick={nextSlide}
+          className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white p-3 rounded-full transition-all duration-300"
+        >
+          <FaChevronRight className="text-xl" />
+        </button>
+
+        {/* Carousel Indicators */}
+        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-20 flex space-x-2">
+          {carouselImages.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                index === currentSlide 
+                  ? 'bg-white scale-125' 
+                  : 'bg-white/50 hover:bg-white/75'
+              }`}
+            />
+          ))}
         </div>
 
         {/* Floating Elements */}
@@ -533,6 +625,8 @@ export default function HomePage() {
           </motion.div>
         </div>
       </section>
-    </div>
+      </div>
+      <Footer />
+    </>
   );
 }

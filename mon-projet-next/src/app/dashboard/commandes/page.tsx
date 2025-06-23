@@ -2,7 +2,7 @@
 import Sidebar from "@/app/components/Sidebar/Sidebar";
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { FaSearch, FaEye, FaTruck, FaCheckCircle, FaClock, FaTimesCircle, FaBox, FaExclamationTriangle, FaBan } from "react-icons/fa";
+import { FaSearch, FaEye, FaTruck, FaCheckCircle, FaClock, FaTimesCircle, FaBox, FaExclamationTriangle, FaBan, FaUser, FaMapMarkerAlt, FaFileImage, FaDownload, FaExpand, FaTimes, FaHospital } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -18,11 +18,27 @@ interface OrderItem {
   imageUrl?: string;
 }
 
+interface UserInfo {
+  name: string;
+  email: string;
+  phone?: string;
+}
+
+interface PrescriptionInfo {
+  clinicName?: string;
+  prescriptionFile?: string;
+  uploadedAt?: string;
+  originalFileName?: string;
+  fileSize?: number;
+  fileType?: string;
+}
+
 interface Order {
   _id: string;
   userId: string;
   orderNumber: string;
   items: OrderItem[];
+  userInfo?: UserInfo; // Account holder info
   shippingAddress: {
     fullName: string;
     address: string;
@@ -31,6 +47,8 @@ interface Order {
     country: string;
     phone?: string;
   };
+  prescription?: PrescriptionInfo;
+  prescriptionImages?: string[]; // For backward compatibility
   subtotal: number;
   shippingCost: number;
   totalAmount: number;
@@ -39,6 +57,8 @@ interface Order {
   paymentMethod: string;
   trackingNumber?: string;
   estimatedDelivery?: string;
+  requiresPrescription?: boolean;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -70,6 +90,84 @@ const statusIcon = {
   cancelled: <FaTimesCircle className="text-red-600" />,
 };
 
+// Prescription Image Viewer Component
+function PrescriptionViewer({
+  prescriptionUrl,
+  fileName,
+  onClose
+}: {
+  prescriptionUrl: string;
+  fileName?: string;
+  onClose: () => void;
+}) {
+  const isPdf = prescriptionUrl.toLowerCase().includes('.pdf') || fileName?.toLowerCase().endsWith('.pdf');
+
+  const handleDownload = () => {
+    const link = document.createElement('a');
+    link.href = prescriptionUrl;
+    link.download = fileName || 'prescription';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] w-full flex flex-col">
+        {/* Header */}
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Ordonnance - {fileName || 'Prescription'}
+          </h3>
+          <div className="flex gap-2">
+            <button
+              onClick={handleDownload}
+              className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+              title="Télécharger"
+            >
+              <FaDownload />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+              title="Fermer"
+            >
+              <FaTimes />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 p-4 overflow-auto">
+          {isPdf ? (
+            <div className="text-center">
+              <FaFileImage className="mx-auto text-6xl text-gray-400 mb-4" />
+              <p className="text-gray-600 mb-4">Fichier PDF détecté</p>
+              <button
+                onClick={handleDownload}
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <FaDownload className="inline mr-2" />
+                Télécharger le PDF
+              </button>
+            </div>
+          ) : (
+            <div className="text-center">
+              <img
+                src={prescriptionUrl}
+                alt="Prescription"
+                className="max-w-full max-h-full object-contain mx-auto rounded-lg shadow-lg"
+                style={{ maxHeight: 'calc(90vh - 200px)' }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
@@ -80,6 +178,9 @@ export default function AdminOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [showPrescriptionViewer, setShowPrescriptionViewer] = useState(false);
+  const [currentPrescriptionUrl, setCurrentPrescriptionUrl] = useState("");
+  const [currentPrescriptionFileName, setCurrentPrescriptionFileName] = useState("");
 
   // Stats
   const stats = {
@@ -126,7 +227,8 @@ export default function AdminOrdersPage() {
     if (searchTerm.trim()) {
       filtered = filtered.filter(order =>
         (order.orderNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.shippingAddress.fullName.toLowerCase().includes(searchTerm.toLowerCase())
+        order.shippingAddress.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.userInfo?.name || "").toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -165,7 +267,32 @@ export default function AdminOrdersPage() {
     return amount.toLocaleString("fr-FR") + " FCFA";
   }
 
-  // Statuses the admin can set (en traitement excluded)
+  function formatFileSize(bytes: number) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function openPrescriptionViewer(url: string, fileName?: string) {
+    setCurrentPrescriptionUrl(url);
+    setCurrentPrescriptionFileName(fileName || 'prescription');
+    setShowPrescriptionViewer(true);
+  }
+
+  // Get prescription URL (support both new and old format)
+  function getPrescriptionUrl(order: Order): string | null {
+    if (order.prescription?.prescriptionFile) {
+      return order.prescription.prescriptionFile;
+    }
+    if (order.prescriptionImages && order.prescriptionImages.length > 0) {
+      return order.prescriptionImages[0];
+    }
+    return null;
+  }
+
+  // Statuses the admin can set
   const adminSettableStatus: OrderStatus[] = ["confirmed", "shipped", "delivered", "cancelled"];
 
   return (
@@ -259,85 +386,125 @@ export default function AdminOrdersPage() {
               </div>
             ) : filteredOrders.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[540px]">
+                <table className="w-full text-left border-collapse min-w-[640px]">
                   <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
                     <tr>
                       <th className="p-2 sm:p-4 font-semibold">Numéro</th>
                       <th className="p-2 sm:p-4 font-semibold">Utilisateur</th>
+                      <th className="p-2 sm:p-4 font-semibold">Livré à</th>
                       <th className="p-2 sm:p-4 font-semibold">Montant</th>
                       <th className="p-2 sm:p-4 font-semibold">Date</th>
                       <th className="p-2 sm:p-4 font-semibold">Statut</th>
+                      <th className="p-2 sm:p-4 font-semibold">Ordonnance</th>
                       <th className="p-2 sm:p-4 font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOrders.map((order, idx) => (
-                      <motion.tr
-                        key={order._id}
-                        className="border-b border-gray-100 hover:bg-blue-50 transition-colors duration-100"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: idx * 0.04 }}
-                      >
-                        <td className="p-2 sm:p-4 font-bold text-blue-700">{order.orderNumber || order._id.slice(-6)}</td>
-                        <td className="p-2 sm:p-4 text-black">{order.shippingAddress.fullName}</td>
-                        <td className="p-2 sm:p-4 font-semibold text-blue-600">{formatCurrency(order.totalAmount)}</td>
-                        <td className="p-2 sm:p-4 text-black">{formatDate(order.createdAt)}</td>
-                        <td className="p-2 sm:p-4">
-                          <span className={`px-2 sm:px-3 py-1 rounded border text-xs font-semibold flex items-center gap-2 ${statusColor[order.status]}`}>
-                            {statusIcon[order.status]} {statusLabel[order.status]}
-                          </span>
-                        </td>
-                        <td className="p-2 sm:p-4">
-                          <div className="flex gap-1 sm:gap-2 flex-wrap">
-                            <button
-                              title="Voir détails"
-                              className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-100 rounded"
-                              onClick={() => { setSelectedOrder(order); setShowModal(true); }}
-                            >
-                              <FaEye />
-                            </button>
-                            {/* Status actions (admin can set: confirmée, expédiée, livrée, annulée) */}
-                            {order.status !== "delivered" && order.status !== "cancelled" && (
-                              <>
-                                {adminSettableStatus.map(s =>
-                                  s !== order.status ? (
-                                    <button
-                                      key={s}
-                                      className={`${
-                                        s === "confirmed"
-                                          ? "text-blue-700 hover:text-blue-900 hover:bg-blue-100"
-                                          : s === "shipped"
-                                          ? "text-purple-700 hover:text-purple-900 hover:bg-purple-100"
-                                          : s === "delivered"
-                                          ? "text-green-700 hover:text-green-900 hover:bg-green-100"
-                                          : s === "cancelled"
-                                          ? "text-red-700 hover:text-red-900 hover:bg-red-100"
-                                          : ""
-                                      } p-2 rounded`}
-                                      title={`Marquer comme ${statusLabel[s]}`}
-                                      disabled={updatingOrderId === order._id}
-                                      onClick={() => updateOrderStatus(order._id, s)}
-                                    >
-                                      {updatingOrderId === order._id ? (
-                                        <div className="animate-spin h-4 w-4 border-2 border-blue-600 rounded-full border-t-transparent"></div>
-                                      ) : (
-                                        <>
-                                          {s === "confirmed" && <FaCheckCircle />}
-                                          {s === "shipped" && <FaTruck />}
-                                          {s === "delivered" && <FaCheckCircle />}
-                                          {s === "cancelled" && <FaBan />}
-                                        </>
-                                      )}
-                                    </button>
-                                  ) : null
+                    {filteredOrders.map((order, idx) => {
+                      const prescriptionUrl = getPrescriptionUrl(order);
+                      return (
+                        <motion.tr
+                          key={order._id}
+                          className="border-b border-gray-100 hover:bg-blue-50 transition-colors duration-100"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: idx * 0.04 }}
+                        >
+                          <td className="p-2 sm:p-4 font-bold text-blue-700">{order.orderNumber || order._id.slice(-6)}</td>
+                          <td className="p-2 sm:p-4">
+                            <div className="flex items-center gap-2">
+                              <FaUser className="text-gray-500 text-sm" />
+                              <span className="text-black font-medium">
+                                {order.userInfo?.name || 'Utilisateur non trouvé'}
+                              </span>
+
+                            </div>
+                          </td>
+                          <td className="p-2 sm:p-4">
+                            <div className="flex items-center gap-2">
+                              <FaMapMarkerAlt className="text-gray-500 text-sm" />
+                              <span className="text-black">{order.shippingAddress.fullName}</span>
+                            </div>
+                          </td>
+                          <td className="p-2 sm:p-4 font-semibold text-blue-600">{formatCurrency(order.totalAmount)}</td>
+                          <td className="p-2 sm:p-4 text-black">{formatDate(order.createdAt)}</td>
+                          <td className="p-2 sm:p-4">
+                            <span className={`px-2 sm:px-3 py-1 rounded border text-xs font-semibold flex items-center gap-2 ${statusColor[order.status]}`}>
+                              {statusIcon[order.status]} {statusLabel[order.status]}
+                            </span>
+                          </td>
+                          <td className="p-2 sm:p-4">
+                            {prescriptionUrl ? (
+                              <button
+                                onClick={() => openPrescriptionViewer(
+                                  prescriptionUrl,
+                                  order.prescription?.originalFileName
                                 )}
-                              </>
+                                className="flex items-center gap-2 text-green-600 hover:text-green-800 hover:bg-green-50 px-2 py-1 rounded transition-colors"
+                                title="Voir l'ordonnance"
+                              >
+                                <FaFileImage />
+                                <span className="text-xs">Voir</span>
+                              </button>
+                            ) : order.requiresPrescription ? (
+                              <span className="text-orange-600 text-xs flex items-center gap-1">
+                                <FaExclamationTriangle />
+                                Requise
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">-</span>
                             )}
-                          </div>
-                        </td>
-                      </motion.tr>
-                    ))}
+                          </td>
+                          <td className="p-2 sm:p-4">
+                            <div className="flex gap-1 sm:gap-2 flex-wrap">
+                              <button
+                                title="Voir détails"
+                                className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-100 rounded"
+                                onClick={() => { setSelectedOrder(order); setShowModal(true); }}
+                              >
+                                <FaEye />
+                              </button>
+                              {/* Status actions */}
+                              {order.status !== "delivered" && order.status !== "cancelled" && (
+                                <>
+                                  {adminSettableStatus.map(s =>
+                                    s !== order.status ? (
+                                      <button
+                                        key={s}
+                                        className={`${s === "confirmed"
+                                            ? "text-blue-700 hover:text-blue-900 hover:bg-blue-100"
+                                            : s === "shipped"
+                                              ? "text-purple-700 hover:text-purple-900 hover:bg-purple-100"
+                                              : s === "delivered"
+                                                ? "text-green-700 hover:text-green-900 hover:bg-green-100"
+                                                : s === "cancelled"
+                                                  ? "text-red-700 hover:text-red-900 hover:bg-red-100"
+                                                  : ""
+                                          } p-2 rounded`}
+                                        title={`Marquer comme ${statusLabel[s]}`}
+                                        disabled={updatingOrderId === order._id}
+                                        onClick={() => updateOrderStatus(order._id, s)}
+                                      >
+                                        {updatingOrderId === order._id ? (
+                                          <div className="animate-spin h-4 w-4 border-2 border-blue-600 rounded-full border-t-transparent"></div>
+                                        ) : (
+                                          <>
+                                            {s === "confirmed" && <FaCheckCircle />}
+                                            {s === "shipped" && <FaTruck />}
+                                            {s === "delivered" && <FaCheckCircle />}
+                                            {s === "cancelled" && <FaBan />}
+                                          </>
+                                        )}
+                                      </button>
+                                    ) : null
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -358,7 +525,7 @@ export default function AdminOrdersPage() {
           {showModal && selectedOrder && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
               <motion.div
-                className="bg-white shadow-xl w-full max-w-lg sm:max-w-2xl max-h-[90vh] overflow-y-auto rounded"
+                className="bg-white shadow-xl w-full max-w-lg sm:max-w-3xl max-h-[90vh] overflow-y-auto rounded"
                 initial={{ scale: 0.92, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.92, opacity: 0 }}
@@ -376,19 +543,179 @@ export default function AdminOrdersPage() {
                       &times;
                     </button>
                   </div>
+
                   {/* Status */}
                   <div className="mb-5 sm:mb-6">
                     <span className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border flex items-center gap-2 w-fit ${statusColor[selectedOrder.status]}`}>
                       {statusIcon[selectedOrder.status]} {statusLabel[selectedOrder.status]}
                     </span>
                   </div>
+
+                  {/* User Information */}
+                  <div className="grid md:grid-cols-2 gap-4 mb-6">
+                    {/* Account Holder */}
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-black mb-3 flex items-center gap-2">
+                        <FaUser className="text-blue-600" /> Nom d'utilisateur
+                      </h4>
+                      <div className="space-y-1">
+                        <p className="font-medium text-black">
+                          {selectedOrder.userInfo?.name || 'Non spécifié'}
+                        </p>
+                        {selectedOrder.userInfo?.email && (
+                          <p className="text-sm text-gray-600">{selectedOrder.userInfo.email}</p>
+                        )}
+                        {selectedOrder.userInfo?.phone && (
+                          <p className="text-sm text-gray-600">{selectedOrder.userInfo.phone}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Delivery Address */}
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-black mb-3 flex items-center gap-2">
+                        <FaMapMarkerAlt className="text-green-600" /> Livré à
+                      </h4>
+                      <div className="space-y-1">
+                        <p className="font-medium text-black">{selectedOrder.shippingAddress.fullName}</p>
+                        <p className="text-sm text-gray-600">{selectedOrder.shippingAddress.address}</p>
+                        <p className="text-sm text-gray-600">
+                          {selectedOrder.shippingAddress.postalCode} {selectedOrder.shippingAddress.city}
+                        </p>
+                        <p className="text-sm text-gray-600">{selectedOrder.shippingAddress.country}</p>
+                        {selectedOrder.shippingAddress.phone && (
+                          <p className="text-sm text-gray-600">{selectedOrder.shippingAddress.phone}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Prescription Section */}
+                  {(selectedOrder.prescription?.prescriptionFile || selectedOrder.prescriptionImages?.length || selectedOrder.requiresPrescription) && (
+                    <div className="mb-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                      <h4 className="font-semibold text-black mb-3 flex items-center gap-2">
+                        <FaHospital className="text-yellow-600" /> Ordonnance médicale
+                      </h4>
+
+                      {selectedOrder.prescription?.prescriptionFile ? (
+                        <div className="space-y-3">
+                          {/* Clinic Info */}
+                          {selectedOrder.prescription.clinicName && (
+                            <div className="flex items-center gap-2 text-sm text-gray-700">
+                              <FaHospital className="text-gray-500" />
+                              <span>Clinique: {selectedOrder.prescription.clinicName}</span>
+                            </div>
+                          )}
+
+                          {/* Prescription Image/File */}
+                          <div className="bg-white p-3 rounded border">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-700">
+                                {selectedOrder.prescription.originalFileName || 'Ordonnance'}
+                              </span>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => openPrescriptionViewer(
+                                    selectedOrder.prescription!.prescriptionFile!,
+                                    selectedOrder.prescription!.originalFileName
+                                  )}
+                                  className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50"
+                                  title="Voir en grand"
+                                >
+                                  <FaExpand />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = selectedOrder.prescription!.prescriptionFile!;
+                                    link.download = selectedOrder.prescription!.originalFileName || 'prescription';
+                                    link.target = '_blank';
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                  }}
+                                  className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50"
+                                  title="Télécharger"
+                                >
+                                  <FaDownload />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Preview */}
+                            <div className="text-center">
+                              {selectedOrder.prescription.prescriptionFile.toLowerCase().includes('.pdf') ? (
+                                <div className="flex flex-col items-center py-4">
+                                  <FaFileImage className="text-4xl text-gray-400 mb-2" />
+                                  <span className="text-sm text-gray-600">Fichier PDF</span>
+                                </div>
+                              ) : (
+                                <img
+                                  src={selectedOrder.prescription.prescriptionFile}
+                                  alt="Prescription"
+                                  className="max-w-full h-32 object-cover mx-auto rounded cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => openPrescriptionViewer(
+                                    selectedOrder.prescription!.prescriptionFile!,
+                                    selectedOrder.prescription!.originalFileName
+                                  )}
+                                />
+                              )}
+                            </div>
+
+                            {/* File Details */}
+                            <div className="mt-2 text-xs text-gray-500 space-y-1">
+                              {selectedOrder.prescription.uploadedAt && (
+                                <p>Téléchargé le: {formatDate(selectedOrder.prescription.uploadedAt)}</p>
+                              )}
+                              {selectedOrder.prescription.fileSize && (
+                                <p>Taille: {formatFileSize(selectedOrder.prescription.fileSize)}</p>
+                              )}
+                              {selectedOrder.prescription.fileType && (
+                                <p>Type: {selectedOrder.prescription.fileType}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : selectedOrder.prescriptionImages?.length ? (
+                        <div className="space-y-3">
+                          <p className="text-sm text-gray-700">Ordonnance (format ancien):</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {selectedOrder.prescriptionImages.map((url, index) => (
+                              <div key={index} className="bg-white p-2 rounded border">
+                                <img
+                                  src={url}
+                                  alt={`Prescription ${index + 1}`}
+                                  className="w-full h-24 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => openPrescriptionViewer(url, `prescription-${index + 1}`)}
+                                />
+                                <div className="flex justify-center mt-2">
+                                  <button
+                                    onClick={() => openPrescriptionViewer(url, `prescription-${index + 1}`)}
+                                    className="text-blue-600 hover:text-blue-800 text-xs"
+                                  >
+                                    Voir en grand
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : selectedOrder.requiresPrescription ? (
+                        <div className="flex items-center gap-2 text-orange-600">
+                          <FaExclamationTriangle />
+                          <span className="text-sm">Ordonnance requise mais non fournie</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
                   {/* Items */}
                   <div className="mb-5 sm:mb-6">
                     <h4 className="font-semibold text-black mb-2 sm:mb-3 text-base sm:text-lg">Produits commandés</h4>
                     <div className="space-y-2 sm:space-y-3">
                       {selectedOrder.items.map((item, i) => (
                         <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2 sm:p-3 bg-gray-50">
-                          <div>
+                          <div className="flex-1">
                             <p className="font-medium text-black text-sm sm:text-base">{item.name}</p>
                             <p className="text-xs sm:text-sm text-black">Prix unitaire: {formatCurrency(item.price)}</p>
                           </div>
@@ -400,24 +727,17 @@ export default function AdminOrdersPage() {
                       ))}
                     </div>
                   </div>
-                  {/* Shipping Address */}
-                  <div className="mb-5 sm:mb-6">
-                    <h4 className="font-semibold text-black mb-2 sm:mb-3 flex items-center gap-2 text-base sm:text-lg">
-                      <FaBox /> Adresse de livraison
-                    </h4>
-                    <div className="bg-gray-50 p-2 sm:p-4">
-                      <p className="font-medium text-black">{selectedOrder.shippingAddress.fullName}</p>
-                      <p className="text-black">{selectedOrder.shippingAddress.address}</p>
-                      <p className="text-black">{selectedOrder.shippingAddress.postalCode} {selectedOrder.shippingAddress.city}</p>
-                      <p className="text-black">{selectedOrder.shippingAddress.country}</p>
-                      {selectedOrder.shippingAddress.phone && (
-                        <p className="mt-2 flex items-center gap-2 text-black">
-                          <FaBox className="text-sm" />
-                          {selectedOrder.shippingAddress.phone}
-                        </p>
-                      )}
+
+                  {/* Notes */}
+                  {selectedOrder.notes && (
+                    <div className="mb-5 sm:mb-6">
+                      <h4 className="font-semibold text-black mb-2 sm:mb-3 text-base sm:text-lg">Notes</h4>
+                      <div className="bg-gray-50 p-3 rounded">
+                        <p className="text-black text-sm">{selectedOrder.notes}</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
                   {/* Summary */}
                   <div className="border-t pt-3 sm:pt-4">
                     <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
@@ -438,6 +758,7 @@ export default function AdminOrdersPage() {
                       Commande passée le {formatDate(selectedOrder.createdAt)}
                     </p>
                   </div>
+
                   {/* Modal Actions */}
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-5 sm:mt-6 pt-3 sm:pt-4 border-t">
                     {selectedOrder.status !== "delivered" && selectedOrder.status !== "cancelled" && (
@@ -447,17 +768,16 @@ export default function AdminOrdersPage() {
                             <button
                               key={s}
                               onClick={() => updateOrderStatus(selectedOrder._id, s)}
-                              className={`flex-1 px-2 py-2 sm:px-4 sm:py-2 ${
-                                s === "confirmed"
+                              className={`flex-1 px-2 py-2 sm:px-4 sm:py-2 ${s === "confirmed"
                                   ? "bg-blue-600 hover:bg-blue-700"
                                   : s === "shipped"
-                                  ? "bg-purple-600 hover:bg-purple-700"
-                                  : s === "delivered"
-                                  ? "bg-green-600 hover:bg-green-700"
-                                  : s === "cancelled"
-                                  ? "bg-red-600 hover:bg-red-700"
-                                  : ""
-                              } text-white transition-colors text-xs sm:text-base`}
+                                    ? "bg-purple-600 hover:bg-purple-700"
+                                    : s === "delivered"
+                                      ? "bg-green-600 hover:bg-green-700"
+                                      : s === "cancelled"
+                                        ? "bg-red-600 hover:bg-red-700"
+                                        : ""
+                                } text-white transition-colors text-xs sm:text-base`}
                               disabled={updatingOrderId === selectedOrder._id}
                             >
                               {updatingOrderId === selectedOrder._id ? "Traitement..." : `Marquer comme ${statusLabel[s]}`}
@@ -476,6 +796,15 @@ export default function AdminOrdersPage() {
                 </div>
               </motion.div>
             </div>
+          )}
+
+          {/* Prescription Viewer Modal */}
+          {showPrescriptionViewer && (
+            <PrescriptionViewer
+              prescriptionUrl={currentPrescriptionUrl}
+              fileName={currentPrescriptionFileName}
+              onClose={() => setShowPrescriptionViewer(false)}
+            />
           )}
         </div>
       </div>

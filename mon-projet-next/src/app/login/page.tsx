@@ -219,7 +219,7 @@ const LoginPage = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.5 }}
             >
-              Welcome Back!
+              Bienvenue!
             </motion.h2>
             <motion.p 
               className="text-gray-600"
@@ -227,7 +227,7 @@ const LoginPage = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.5 }}
             >
-              Please sign in to your account
+              Veuillez vous connecter à votre compte
             </motion.p>
           </div>
 
@@ -320,7 +320,7 @@ const LoginPage = () => {
                 href="/forgot-password" 
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
               >
-                Forgot password?
+                Mot de passe oublié?
               </Link>
             </motion.div>
 
@@ -361,12 +361,12 @@ const LoginPage = () => {
             transition={{ delay: 0.9, duration: 0.5 }}
           >
             <p className="text-gray-600">
-              Don't have an account?{' '}
+              Vous n'avez pas de compte?{' '}
               <Link 
                 href="/register" 
                 className="text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
               >
-                Sign Up
+                S'inscrire
               </Link>
             </p>
           </motion.div>
