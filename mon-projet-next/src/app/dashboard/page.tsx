@@ -76,6 +76,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
+  const [userName, setUserName] = useState<string>("");
 
   // Update current time every second
   useEffect(() => {
@@ -102,7 +103,8 @@ export default function Dashboard() {
       }
 
       const parsedUser = JSON.parse(userData);
-      
+      setUserName(parsedUser.name || parsedUser.username || parsedUser.email || "Admin");
+
       // Check if user is admin
       if (parsedUser.role !== 'admin') {
         toast.error("Accès refusé. Seuls les administrateurs peuvent accéder à cette page.");
@@ -123,7 +125,7 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      
+
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('Token manquant');
@@ -152,12 +154,13 @@ export default function Dashboard() {
       }
 
       const statsData = await statsResponse.json();
-      const activitiesData = await activitiesResponse.json();
+      const activitiesData: {
+        success: boolean;
+        data: RecentActivity[];
+      } = await activitiesResponse.json();
 
-      if (statsData.success) {
-        setStats(statsData.data.stats);
-        setTopProducts(statsData.data.topProducts);
-      }
+      setStats(statsData.data.stats);
+      setTopProducts(statsData.data.topProducts);
 
       if (activitiesData.success) {
         setRecentActivities(activitiesData.data);
@@ -173,12 +176,12 @@ export default function Dashboard() {
         { month: 'Juin', revenue: stats.totalRevenue || 125000, orders: 500 }
       ];
       setRevenueData(mockRevenueData);
-      
+
       toast.success("📊 Tableau de bord mis à jour avec les données réelles", {
         position: "top-right",
         autoClose: 2000,
       });
-      
+
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
       toast.error(`❌ ${error.message || 'Erreur lors du chargement des données'}`, {
@@ -213,7 +216,7 @@ export default function Dashboard() {
     const now = new Date();
     const time = new Date(timestamp);
     const diffInMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60));
-    
+
     if (diffInMinutes < 1) return 'À l\'instant';
     if (diffInMinutes < 60) return `Il y a ${diffInMinutes}min`;
     if (diffInMinutes < 1440) return `Il y a ${Math.floor(diffInMinutes / 60)}h`;
@@ -223,9 +226,9 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        
+
         <Sidebar />
-        
+
         <div className="flex-1 ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
           <div className="flex items-center justify-center min-h-screen">
             <div className="text-center">
@@ -240,14 +243,14 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      
+
       <Sidebar />
 
       <div className="flex-1 ml-16 lg:ml-64 transition-all duration-300 ease-in-out">
         <div className="p-4 lg:p-8 min-h-screen overflow-auto">
-          
+
           {/* Header Section */}
-          <motion.div 
+          <motion.div
             className="mb-8"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -267,16 +270,16 @@ export default function Dashboard() {
                   </p>
                 </div>
               </div>
-              
+
               {/* Current Date/Time Display */}
               <div className="bg-white shadow-lg border border-gray-100  p-4 space-y-2">
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <CalendarDaysIcon className="h-4 w-4" />
-                  <span>{currentDateTime.toLocaleDateString('fr-FR', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
+                  <span>{currentDateTime.toLocaleDateString('fr-FR', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
                   })}</span>
                 </div>
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -284,7 +287,7 @@ export default function Dashboard() {
                   <span>{currentDateTime.toLocaleTimeString('fr-FR')}</span>
                 </div>
                 <div className="text-xs text-gray-500">
-                  Connecté: Joedev247
+                  Connecté: {userName}
                 </div>
               </div>
             </div>
@@ -389,7 +392,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Chiffre d'Affaires</p>
-                  <p className="text-3xl font-bold text-gray-900">{stats.totalRevenue.toLocaleString()}€</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.totalRevenue.toLocaleString()} FCFA</p>
                   <div className="flex items-center mt-2">
                     <ArrowTrendingUpIcon className="h-4 w-4 text-green-500 mr-1" />
                     <span className="text-sm text-green-600 font-medium">+12.5%</span>
@@ -480,7 +483,7 @@ export default function Dashboard() {
 
           {/* Charts and Lists Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            
+
             {/* Revenue Chart */}
             <motion.div
               className="bg-white  shadow-lg border border-gray-100 p-6"
@@ -500,7 +503,7 @@ export default function Dashboard() {
                   <option value="year">12 mois</option>
                 </select>
               </div>
-              
+
               {/* Simple Bar Chart */}
               <div className="space-y-4">
                 {revenueData.map((item, index) => (
@@ -537,14 +540,14 @@ export default function Dashboard() {
             >
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-gray-900">Produits les Plus Vendus</h3>
-                <button 
+                <button
                   onClick={() => router.push("/dashboard/produits")}
                   className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                 >
                   Voir tout
                 </button>
               </div>
-              
+
               <div className="space-y-4">
                 {topProducts.length > 0 ? (
                   topProducts.map((product, index) => (
@@ -599,7 +602,7 @@ export default function Dashboard() {
                 Actualiser
               </button>
             </div>
-            
+
             <div className="space-y-3">
               {recentActivities.length > 0 ? (
                 recentActivities.map((activity, index) => (
