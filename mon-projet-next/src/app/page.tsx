@@ -93,7 +93,7 @@ function ProductCard({ product, index, onAddToCart }: ProductCardProps) {
           />
           
           {/* Stock Badge */}
-          {product.stock <= 5 && product.stock > 0 && (
+          {product.stock <= 15 && product.stock > 0 && (
             <div className="absolute top-3 right-3 bg-orange-500 text-white text-xs px-2 py-1 font-semibold">
               Stock faible
             </div>
@@ -156,7 +156,7 @@ function ProductCard({ product, index, onAddToCart }: ProductCardProps) {
             {product.price.toLocaleString()} FCFA
           </div>
           <div className={`text-sm font-medium ${
-            product.stock > 5 ? 'text-green-600' :
+            product.stock > 15 ? 'text-green-600' :
             product.stock > 0 ? 'text-orange-600' : 'text-red-600'
           }`}>
             {product.stock > 0 ? `En stock (${product.stock})` : 'Rupture de stock'}

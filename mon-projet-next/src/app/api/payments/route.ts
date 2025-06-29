@@ -88,8 +88,8 @@ export async function POST(req: NextRequest) {
       { _id: result.insertedId },
       {
         $set: {
-          status: paymentResponse.status,
-          response: paymentResponse,
+          status: paymentResponse?.status ?? 'pending',
+          response: paymentResponse ?? {},
           updatedAt: new Date()
         }
       }
@@ -100,8 +100,8 @@ export async function POST(req: NextRequest) {
       data: {
         paymentId: result.insertedId,
         transactionId: payment.transactionId,
-        status: paymentResponse.status,
-        message: paymentResponse.message
+        status: paymentResponse?.status ?? 'pending',
+        message: paymentResponse?.message ?? 'Payment processing'
       }
     });
 

@@ -56,10 +56,16 @@ export async function GET(req: NextRequest) {
         { $group: { _id: null, total: { $sum: '$totalAmount' } } }
       ]).toArray(),
       
-      // Low stock products
+      // Low stock products (either stock <= minStock or stock <= 15 if no minStock)
       db.collection('products').find({
         isActive: true,
-        $expr: { $lte: ['$stock', '$minStock'] }
+        $or: [
+          { $expr: { $lte: ['$stock', '$minStock'] } },
+          { 
+            minStock: { $exists: false },
+            stock: { $lte: 15 }
+          }
+        ]
       }).limit(10).toArray(),
       
       // Recent orders

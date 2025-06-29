@@ -355,15 +355,15 @@ export default function AllProductsPage() {
   // Get stock status
   const getStockStatus = (stock: number) => {
     if (stock === 0) return { text: 'Épuisé', color: 'text-red-600 bg-red-50', icon: '❌' };
-    if (stock <= 5) return { text: 'Stock faible', color: 'text-orange-600 bg-orange-50', icon: '⚠️' };
-    if (stock <= 20) return { text: 'Stock moyen', color: 'text-yellow-600 bg-yellow-50', icon: '📦' };
-    return { text: 'En stock', color: 'text-green-600 bg-green-50', icon: '✅' };
+    if (stock <= 15) return { text: 'Stock faible', color: 'text-orange-600 bg-orange-50', icon: '⚠️' };
+    if (stock <= 49) return { text: 'Stock moyen', color: 'text-yellow-600 bg-yellow-50', icon: '📦' };
+    return { text: 'Stock élevé', color: 'text-green-600 bg-green-50', icon: '✅' };
   };
 
   // Calculate statistics
   const totalProducts = products.length;
   const totalValue = products.reduce((sum, product) => sum + (product.price * product.stock), 0);
-  const lowStockCount = products.filter(product => product.stock <= 5).length;
+  const lowStockCount = products.filter(product => product.stock <= 15).length;
   const categoriesCount = [...new Set(products.map(p => p.category).filter(Boolean))].length;
 
   return (
@@ -774,7 +774,7 @@ export default function AllProductsPage() {
                       
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600">Stock:</span>
-                        <span className={`font-semibold ${product.stock > 5 ? 'text-green-600' : product.stock > 0 ? 'text-orange-600' : 'text-red-600'}`}>
+                        <span className={`font-semibold ${product.stock > 15 ? 'text-green-600' : product.stock > 0 ? 'text-orange-600' : 'text-red-600'}`}>
                           {product.stock} unités
                         </span>
                       </div>

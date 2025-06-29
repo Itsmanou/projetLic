@@ -308,14 +308,14 @@ export default function ProduitDetail() {
               <div className="bg-gray-100 p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-gray-900">Disponibilité</span>
-                  <span className={`font-semibold ${produit.stock > 10 ? 'text-green-600' :
-                      produit.stock > 0 ? 'text-orange-600' : 'text-red-600'
+                  <span className={`font-semibold ${produit.stock > 50 ? 'text-green-600' :
+                      produit.stock > 15 ? 'text-yellow-600' : produit.stock > 0 ? 'text-orange-600' : 'text-red-600'
                     }`}>
                     {produit.stock > 0 ? `${produit.stock} en stock` : 'Rupture de stock'}
                   </span>
                 </div>
 
-                {produit.stock > 0 && produit.stock <= 10 && (
+                {produit.stock > 0 && produit.stock <= 15 && (
                   <div className="flex items-center gap-2 text-orange-600">
                     <FaExclamationTriangle />
                     <span className="text-sm">Stock limité - Commandez rapidement!</span>

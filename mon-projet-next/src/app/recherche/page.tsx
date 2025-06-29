@@ -475,7 +475,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ produit, index, onA
       className="bg-white shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden relative"
     >
       {/* Stock badge */}
-      {produit.stock <= 5 && produit.stock > 0 && (
+      {produit.stock <= 15 && produit.stock > 0 && (
         <div className="absolute top-2 right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full z-10">
           Stock faible
         </div>
@@ -541,7 +541,7 @@ const SearchResultCard: React.FC<SearchResultCardProps> = ({ produit, index, onA
         </p>
 
         {/* Stock info */}
-        <p className={`text-sm mb-4 ${produit.stock > 5 ? 'text-green-600' : produit.stock > 0 ? 'text-orange-600' : 'text-red-600'}`}>
+        <p className={`text-sm mb-4 ${produit.stock > 15 ? 'text-green-600' : produit.stock > 0 ? 'text-orange-600' : 'text-red-600'}`}>
           {produit.stock > 0 ? `En stock (${produit.stock})` : 'Rupture de stock'}
         </p>
 

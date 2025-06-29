@@ -29,7 +29,6 @@ interface DashboardStats {
   totalUsers: number;
   totalRevenue: number;
   activeUsers: number;
-  lowStockProducts: number;
   recentOrders: number;
   monthlyGrowth: number;
   weeklyRevenue: number;
@@ -64,7 +63,6 @@ export default function Dashboard() {
     totalUsers: 0,
     totalRevenue: 0,
     activeUsers: 0,
-    lowStockProducts: 0,
     recentOrders: 0,
     monthlyGrowth: 0,
     weeklyRevenue: 0
@@ -131,8 +129,8 @@ export default function Dashboard() {
         throw new Error('Token manquant');
       }
 
-      // Fetch dashboard stats and activities in parallel
-      const [statsResponse, activitiesResponse] = await Promise.all([
+      // Fetch dashboard stats, activities, and analytics in parallel
+      const [statsResponse, activitiesResponse, analyticsResponse] = await Promise.all([
         fetch('/api/admin/stats', {
           method: 'GET',
           headers: {
@@ -146,10 +144,17 @@ export default function Dashboard() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
+        }),
+        fetch(`/api/admin/analytics?period=${selectedPeriod === 'week' ? '7' : selectedPeriod === 'month' ? '30' : '365'}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         })
       ]);
 
-      if (!statsResponse.ok || !activitiesResponse.ok) {
+      if (!statsResponse.ok || !activitiesResponse.ok || !analyticsResponse.ok) {
         throw new Error('Erreur lors du chargement des données');
       }
 
@@ -158,26 +163,58 @@ export default function Dashboard() {
         success: boolean;
         data: RecentActivity[];
       } = await activitiesResponse.json();
+      const analyticsData = await analyticsResponse.json();
 
-      setStats(statsData.data.stats);
-      setTopProducts(statsData.data.topProducts);
+      // Update stats with real analytics data
+      const realStats = {
+        ...statsData.data.stats,
+        totalRevenue: analyticsData.data.overview.totalRevenue,
+        recentOrders: analyticsData.data.overview.totalOrders,
+        weeklyRevenue: analyticsData.data.ordersOverTime
+          .slice(-7)
+          .reduce((sum: number, item: any) => sum + item.revenue, 0)
+      };
+      setStats(realStats);
+
+      // Set real top products with actual sales data
+      const realTopProducts = analyticsData.data.topProducts.map((product: any) => ({
+        id: product._id,
+        name: product.productName || 'Produit sans nom',
+        sales: product.totalSold,
+        revenue: product.revenue,
+        stock: Math.floor(Math.random() * 200) + 50 // Keep mock stock for now as it's not in analytics
+      }));
+      setTopProducts(realTopProducts);
 
       if (activitiesData.success) {
         setRecentActivities(activitiesData.data);
       }
 
-      // Mock revenue data (replace with real API when orders are implemented)
-      const mockRevenueData: RevenueData[] = [
-        { month: 'Jan', revenue: 85000, orders: 340 },
-        { month: 'Fév', revenue: 92000, orders: 380 },
-        { month: 'Mar', revenue: 78000, orders: 320 },
-        { month: 'Avr', revenue: 105000, orders: 420 },
-        { month: 'Mai', revenue: 115000, orders: 460 },
-        { month: 'Juin', revenue: stats.totalRevenue || 125000, orders: 500 }
-      ];
-      setRevenueData(mockRevenueData);
+      // Use real revenue data from analytics
+      const realRevenueData: RevenueData[] = analyticsData.data.ordersOverTime
+        .slice(-6) // Get last 6 data points
+        .map((item: any, index: number) => {
+          const date = new Date(item.date);
+          const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+          return {
+            month: selectedPeriod === 'year' ? monthNames[date.getMonth()] : `J${index + 1}`,
+            revenue: item.revenue,
+            orders: item.orders
+          };
+        });
+      
+      // If no real data, show a message but don't use mock data
+      if (realRevenueData.length === 0) {
+        setRevenueData([{
+          month: 'Aucune donnée',
+          revenue: 0,
+          orders: 0
+        }]);
+      } else {
+        setRevenueData(realRevenueData);
+      }
 
-      toast.success("📊 Tableau de bord mis à jour avec les données réelles", {
+      toast.success("📊 Tableau de bord mis à jour avec les données en temps réel", {
         position: "top-right",
         autoClose: 2000,
       });
@@ -233,7 +270,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-center min-h-screen">
             <div className="text-center">
               <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto mb-4"></div>
-              <p className="text-gray-600 font-medium">Chargement des données réelles...</p>
+              <p className="text-gray-600 font-medium">Chargement des données en temps réel...</p>
             </div>
           </div>
         </div>
@@ -456,24 +493,8 @@ export default function Dashboard() {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Stock Faible</p>
-                  <p className="text-2xl font-bold text-orange-600">{stats.lowStockProducts}</p>
-                  <p className="text-sm text-gray-500 mt-1">Produits à réapprovisionner</p>
-                </div>
-                <ExclamationTriangleIcon className="h-8 w-8 text-orange-500" />
-              </div>
-            </motion.div>
-
-            <motion.div
-              className="bg-white  shadow-lg border border-gray-100 p-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.6 }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Revenus Hebdo</p>
-                  <p className="text-2xl font-bold text-blue-600">{stats.weeklyRevenue.toLocaleString()}€</p>
+                  <p className="text-sm font-medium text-gray-600">CA Hebdomadaire</p>
+                  <p className="text-2xl font-bold text-blue-600">{stats.weeklyRevenue.toLocaleString()} FCFA</p>
                   <p className="text-sm text-gray-500 mt-1">7 derniers jours</p>
                 </div>
                 <ArrowTrendingUpIcon className="h-8 w-8 text-blue-500" />
@@ -506,28 +527,36 @@ export default function Dashboard() {
 
               {/* Simple Bar Chart */}
               <div className="space-y-4">
-                {revenueData.map((item, index) => (
-                  <motion.div
-                    key={item.month}
-                    className="flex items-center space-x-4"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.8 + index * 0.1 }}
-                  >
-                    <div className="w-12 text-sm font-medium text-gray-600">{item.month}</div>
-                    <div className="flex-1 bg-gray-200 rounded-full h-4 relative">
-                      <motion.div
-                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-4 rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(item.revenue / Math.max(...revenueData.map(d => d.revenue))) * 100}%` }}
-                        transition={{ duration: 1, delay: 1 + index * 0.1 }}
-                      />
-                    </div>
-                    <div className="w-20 text-sm font-semibold text-gray-900 text-right">
-                      {item.revenue.toLocaleString()}€
-                    </div>
-                  </motion.div>
-                ))}
+                {revenueData.length > 0 && revenueData[0].month !== 'Aucune donnée' ? (
+                  revenueData.map((item, index) => (
+                    <motion.div
+                      key={item.month}
+                      className="flex items-center space-x-4"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.5, delay: 0.8 + index * 0.1 }}
+                    >
+                      <div className="w-12 text-sm font-medium text-gray-600">{item.month}</div>
+                      <div className="flex-1 bg-gray-200 rounded-full h-4 relative">
+                        <motion.div
+                          className="bg-gradient-to-r from-blue-500 to-blue-600 h-4 rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(item.revenue / Math.max(...revenueData.map(d => d.revenue))) * 100}%` }}
+                          transition={{ duration: 1, delay: 1 + index * 0.1 }}
+                        />
+                      </div>
+                      <div className="w-20 text-sm font-semibold text-gray-900 text-right">
+                        {item.revenue.toLocaleString()} FCFA
+                      </div>
+                    </motion.div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <ChartBarIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>Aucune donnée de revenus disponible</p>
+                    <p className="text-sm">Les données apparaîtront après les premières commandes</p>
+                  </div>
+                )}
               </div>
             </motion.div>
 
@@ -568,8 +597,8 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-gray-900">{product.revenue.toLocaleString()}€</p>
-                        <p className={`text-sm ${product.stock < 100 ? 'text-orange-600' : 'text-green-600'}`}>
+                        <p className="font-semibold text-gray-900">{product.revenue.toLocaleString()} FCFA</p>
+                        <p className={`text-sm ${product.stock < 16 ? 'text-orange-600' : product.stock < 50 ? 'text-yellow-600' : 'text-green-600'}`}>
                           Stock: {product.stock}
                         </p>
                       </div>

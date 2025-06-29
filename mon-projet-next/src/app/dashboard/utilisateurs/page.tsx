@@ -689,7 +689,7 @@ export default function DashboardUsers() {
                       className="px-3 py-2 bg-gray-200 hover:bg-gray-300 transition-colors duration-200 flex items-center"
                       title={`Tri ${sortOrder === 'asc' ? 'croissant' : 'décroissant'}`}
                     >
-                      <ChevronUpDownIcon className="h-4 w-4" />
+                      <ChevronUpDownIcon className="h-4 w-4 text" />
                       {sortOrder === 'asc' ? '↑' : '↓'}
                     </button>
                   </div>

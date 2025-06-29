@@ -38,10 +38,12 @@ export async function GET(req: NextRequest) {
       totalProducts,
       totalUsers,
       activeUsers,
-      lowStockProducts,
       recentUsers,
       lastMonthUsers,
-      topProducts
+      topProducts,
+      totalRevenue,
+      weeklyRevenue,
+      recentOrders
     ] = await Promise.all([
       // Total products
       db.collection('products').countDocuments(),
@@ -53,11 +55,6 @@ export async function GET(req: NextRequest) {
       db.collection('users').countDocuments({
         isActive: true,
         lastLogin: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
-      }),
-      
-      // Low stock products (stock <= 10)
-      db.collection('products').countDocuments({
-        stock: { $lte: 10 }
       }),
       
       // Users registered this month
@@ -74,7 +71,29 @@ export async function GET(req: NextRequest) {
       db.collection('products').find()
         .sort({ stock: -1 })
         .limit(5)
-        .toArray()
+        .toArray(),
+      
+      // Real total revenue from paid orders
+      db.collection('orders').aggregate([
+        { $match: { paymentStatus: 'paid' } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+      ]).toArray(),
+      
+      // Real weekly revenue from paid orders
+      db.collection('orders').aggregate([
+        { 
+          $match: { 
+            paymentStatus: 'paid',
+            createdAt: { $gte: startOfWeek }
+          } 
+        },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+      ]).toArray(),
+      
+      // Recent orders count (last 30 days)
+      db.collection('orders').countDocuments({
+        createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+      })
     ]);
 
     // Calculate growth percentages
@@ -82,31 +101,65 @@ export async function GET(req: NextRequest) {
       ? ((recentUsers - lastMonthUsers) / lastMonthUsers * 100) 
       : 0;
 
-    // Mock revenue data (you can replace with actual order data when available)
-    const mockRevenue = 125000;
-    const mockWeeklyRevenue = 18500;
-    const mockRecentOrders = 156;
+    // Use real data instead of mock data
+    const realTotalRevenue = totalRevenue[0]?.total || 0;
+    const realWeeklyRevenue = weeklyRevenue[0]?.total || 0;
 
     // Prepare response data
     const dashboardStats = {
       totalProducts,
       totalUsers,
-      totalRevenue: mockRevenue, // Replace with real revenue calculation
+      totalRevenue: realTotalRevenue,
       activeUsers,
-      lowStockProducts,
-      recentOrders: mockRecentOrders, // Replace with real order count
+      recentOrders: recentOrders,
       monthlyGrowth: Math.round(userGrowth * 10) / 10,
-      weeklyRevenue: mockWeeklyRevenue // Replace with real weekly revenue
+      weeklyRevenue: realWeeklyRevenue
     };
 
-    // Transform top products data
-    const transformedTopProducts = topProducts.map((product: any, index: number) => ({
-      id: product._id.toString(),
-      name: product.name,
-      sales: Math.floor(Math.random() * 1000) + 100, // Mock sales data
-      revenue: product.price * Math.floor(Math.random() * 100 + 50), // Mock revenue
-      stock: product.stock
-    }));
+    // Get real top selling products from orders
+    const realTopProducts = await db.collection('orders').aggregate([
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.productId',
+          totalSold: { $sum: '$items.quantity' },
+          revenue: { $sum: '$items.subtotal' },
+          productName: { $first: '$items.name' }
+        }
+      },
+      { $sort: { totalSold: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'productInfo'
+        }
+      },
+      {
+        $addFields: {
+          productInfo: { $arrayElemAt: ['$productInfo', 0] }
+        }
+      }
+    ]).toArray();
+
+    // Transform top products data with real sales data
+    const transformedTopProducts = realTopProducts.length > 0 
+      ? realTopProducts.map((product: any) => ({
+          id: product._id.toString(),
+          name: product.productName || product.productInfo?.name || 'Produit inconnu',
+          sales: product.totalSold,
+          revenue: product.revenue,
+          stock: product.productInfo?.stock || 0
+        }))
+      : topProducts.map((product: any, index: number) => ({
+          id: product._id.toString(),
+          name: product.name,
+          sales: 0, // No sales data available
+          revenue: 0, // No revenue data available
+          stock: product.stock
+        }));
 
     return NextResponse.json({
       success: true,
