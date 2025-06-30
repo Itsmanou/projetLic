@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import {
   EnvelopeIcon,
   PhoneIcon,
@@ -13,7 +14,9 @@ import {
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  ArrowLeftIcon,
+  HomeIcon
 } from '@heroicons/react/24/outline';
 import {
   FaFacebook,
@@ -32,6 +35,7 @@ interface FormData {
 }
 
 export default function Contact() {
+  const router = useRouter();
   const [formData, setFormData] = useState<FormData>({
     nom: '',
     email: '',
@@ -92,17 +96,40 @@ export default function Contact() {
 
     setIsSubmitting(true);
     
-    // Simulate API call
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      toast.success("Votre message a été envoyé avec succès ! Nous vous répondrons dans les plus brefs délais.", {
-        icon: <>🚀</>
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
       });
-      
-      setFormData({ nom: '', email: '', sujet: '', message: '' });
-    } catch (error) {
-      toast.error("❌ Une erreur est survenue. Veuillez réessayer.");
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast.success("🚀 Votre message a été envoyé avec succès ! Nous vous répondrons dans les plus brefs délais.", {
+          autoClose: 5000,
+        });
+        
+        // Show additional info if auto-reply wasn't sent
+        if (!data.details?.autoReplySent) {
+          setTimeout(() => {
+            toast.info("📧 Email de confirmation non envoyé, mais votre message nous est bien parvenu.", {
+              autoClose: 4000,
+            });
+          }, 1000);
+        }
+        
+        setFormData({ nom: '', email: '', sujet: '', message: '' });
+      } else {
+        throw new Error(data.error || 'Erreur lors de l\'envoi du message');
+      }
+    } catch (error: any) {
+      console.error('Contact form error:', error);
+      toast.error(`❌ ${error.message || 'Une erreur est survenue. Veuillez réessayer.'}`, {
+        autoClose: 6000,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -149,6 +176,23 @@ export default function Contact() {
     <>
       <Navbar />
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+
+        {/* Back to Home Button */}
+        <motion.div
+          className="pt-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto"
+          initial={{ x: -20, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-lg shadow-sm transition-colors duration-200 hover:text-blue-600"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            <HomeIcon className="h-4 w-4" />
+            Retour à l'accueil
+          </button>
+        </motion.div>
 
         {/* Hero Section */}
         <motion.div 

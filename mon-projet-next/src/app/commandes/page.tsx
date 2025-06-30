@@ -19,7 +19,9 @@ import {
   FaMapMarkerAlt,
   FaPhone,
   FaSync,
-  FaExclamationTriangle
+  FaExclamationTriangle,
+  FaArrowLeft,
+  FaHome
 } from 'react-icons/fa';
 
 interface Product {
@@ -333,6 +335,23 @@ export default function CommandesPage() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
       >
+        {/* Back to Home Button */}
+        <motion.div
+          className="mb-6"
+          initial={{ x: -20, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-lg shadow-sm transition-colors duration-200 hover:text-blue-600"
+          >
+            <FaArrowLeft className="text-sm" />
+            <FaHome className="text-sm" />
+            Retour à l'accueil
+          </button>
+        </motion.div>
+
         {/* Header */}
         <motion.div
           className="mb-8 text-center"

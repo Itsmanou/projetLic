@@ -5,7 +5,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
-import { FaTrash, FaPlus, FaMinus, FaShoppingBag, FaTruck, FaUser, FaMapMarkerAlt, FaUpload, FaHospital } from "react-icons/fa";
+import { FaTrash, FaPlus, FaMinus, FaShoppingBag, FaTruck, FaUser, FaMapMarkerAlt, FaUpload, FaHospital, FaCheckCircle, FaSpinner, FaExclamationTriangle, FaArrowLeft, FaHome } from "react-icons/fa";
+import Tesseract from 'tesseract.js';
 
 export interface CartItem {
   id: string;
@@ -27,6 +28,8 @@ interface ShippingAddress {
 interface PrescriptionData {
   prescriptionFile: File | null;
   clinicName: string;
+  isValidated: boolean;
+  validationText: string;
 }
 
 export default function PanierPage() {
@@ -47,11 +50,15 @@ export default function PanierPage() {
   });
   const [prescriptionData, setPrescriptionData] = useState<PrescriptionData>({
     prescriptionFile: null,
-    clinicName: ''
+    clinicName: '',
+    isValidated: false,
+    validationText: ''
   });
   const [showCheckout, setShowCheckout] = useState(false);
   const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isValidatingPrescription, setIsValidatingPrescription] = useState(false);
+  const [prescriptionValidationStatus, setPrescriptionValidationStatus] = useState<'idle' | 'validating' | 'valid' | 'invalid'>('idle');
 
   // Check authentication status when component mounts
   useEffect(() => {
@@ -94,12 +101,88 @@ export default function PanierPage() {
   const sousTotal = panier.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const total = sousTotal + (panier.length > 0 ? fraisLivraison : 0);
 
+  // Prescription validation keywords (French and English)
+  const prescriptionKeywords = [
+    // French medical terms
+    'prescription', 'ordonnance', 'médicament', 'posologie', 'traitement',
+    'docteur', 'médecin', 'dr', 'patient', 'date', 'signature',
+    'pharmacie', 'dispensé', 'renouvelable', 'fois par jour',
+    'comprimé', 'gélule', 'sirop', 'injection', 'pommade',
+    'avant repas', 'après repas', 'matin', 'soir', 'midi',
+    
+    // English medical terms (common in some regions)
+    'medication', 'medicine', 'doctor', 'patient', 'dosage',
+    'tablet', 'capsule', 'syrup', 'prescription', 'pharmacy',
+    'times daily', 'before meals', 'after meals', 'morning', 'evening',
+    
+    // Medical abbreviations
+    'mg', 'ml', 'cc', 'bid', 'tid', 'qid', 'od', 'bd', 'tds'
+  ];
+
+  const validatePrescriptionImage = async (file: File): Promise<{ isValid: boolean; extractedText: string }> => {
+    try {
+      setIsValidatingPrescription(true);
+      setPrescriptionValidationStatus('validating');
+
+      const { data: { text } } = await Tesseract.recognize(file, 'fra+eng', {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+          }
+        }
+      });
+
+      const extractedText = text.toLowerCase();
+      console.log('Extracted text:', extractedText);
+
+      // Check if the text contains prescription-related keywords
+      const foundKeywords = prescriptionKeywords.filter(keyword => 
+        extractedText.includes(keyword.toLowerCase())
+      );
+
+      const isValid = foundKeywords.length >= 2; // Require at least 2 medical keywords
+
+      setPrescriptionValidationStatus(isValid ? 'valid' : 'invalid');
+      
+      return {
+        isValid,
+        extractedText: text
+      };
+    } catch (error) {
+      console.error('OCR validation error:', error);
+      setPrescriptionValidationStatus('invalid');
+      return {
+        isValid: false,
+        extractedText: ''
+      };
+    } finally {
+      setIsValidatingPrescription(false);
+    }
+  };
+
   const handleCommander = () => {
     if (!isConnected) {
       setShowModal(true);
-    } else {
-      setShowCheckout(true);
+      return;
     }
+
+    // Validate prescription requirements
+    if (!prescriptionData.prescriptionFile) {
+      toast.error('Veuillez télécharger une prescription médicale avant de continuer.');
+      return;
+    }
+
+    if (!prescriptionData.isValidated) {
+      toast.error('Veuillez attendre la validation de votre prescription ou téléchargez une prescription valide.');
+      return;
+    }
+
+    if (!prescriptionData.clinicName.trim()) {
+      toast.error('Veuillez indiquer le nom de l\'établissement de santé.');
+      return;
+    }
+
+    setShowCheckout(true);
   };
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,14 +190,14 @@ export default function PanierPage() {
     setShippingAddress(prev => ({ ...prev, [name]: value }));
   };
 
-  const handlePrescriptionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePrescriptionFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
 
     if (file) {
-      // Validate file type (images and PDFs)
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+      // Validate file type (only images for OCR)
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
       if (!allowedTypes.includes(file.type)) {
-        toast.error('Format de fichier non supporté. Veuillez utiliser JPG, PNG, GIF ou PDF.');
+        toast.error('Format de fichier non supporté. Veuillez utiliser JPG, PNG ou GIF pour la prescription.');
         return;
       }
 
@@ -125,25 +208,60 @@ export default function PanierPage() {
       }
 
       // Create preview for images
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setImagePreview(e.target?.result as string);
-        };
-        reader.readAsDataURL(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+
+      // Update prescription data first
+      setPrescriptionData(prev => ({ 
+        ...prev, 
+        prescriptionFile: file,
+        isValidated: false,
+        validationText: ''
+      }));
+
+      // Validate prescription using OCR
+      toast.info('Validation de la prescription en cours...');
+      const validation = await validatePrescriptionImage(file);
+      
+      if (validation.isValid) {
+        toast.success('Prescription validée avec succès!');
+        setPrescriptionData(prev => ({ 
+          ...prev, 
+          isValidated: true,
+          validationText: validation.extractedText
+        }));
       } else {
-        setImagePreview(null); // For PDF files
+        toast.error('Cette image ne semble pas être une prescription médicale valide. Veuillez télécharger une image claire d\'une prescription.');
+        setPrescriptionData(prev => ({ 
+          ...prev, 
+          isValidated: false,
+          validationText: validation.extractedText
+        }));
       }
     } else {
       setImagePreview(null);
+      setPrescriptionData(prev => ({ 
+        ...prev, 
+        prescriptionFile: null,
+        isValidated: false,
+        validationText: ''
+      }));
+      setPrescriptionValidationStatus('idle');
     }
-
-    setPrescriptionData(prev => ({ ...prev, prescriptionFile: file }));
   };
 
   const handleRemoveFile = () => {
-    setPrescriptionData(prev => ({ ...prev, prescriptionFile: null }));
+    setPrescriptionData(prev => ({ 
+      ...prev, 
+      prescriptionFile: null,
+      isValidated: false,
+      validationText: ''
+    }));
     setImagePreview(null);
+    setPrescriptionValidationStatus('idle');
     // Reset the file input
     const fileInput = document.getElementById('prescription') as HTMLInputElement;
     if (fileInput) {
@@ -212,7 +330,9 @@ export default function PanierPage() {
         // Reset prescription data
         setPrescriptionData({
           prescriptionFile: null,
-          clinicName: ''
+          clinicName: '',
+          isValidated: false,
+          validationText: ''
         });
         setImagePreview(null);
 
@@ -262,6 +382,23 @@ export default function PanierPage() {
       transition={{ duration: 0.8 }}
     >
       <div className="max-w-6xl mx-auto">
+        {/* Back to Home Button */}
+        <motion.div
+          className="mb-6"
+          initial={{ x: -20, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-lg shadow-sm transition-colors duration-200 hover:text-blue-600"
+          >
+            <FaArrowLeft className="text-sm" />
+            <FaHome className="text-sm" />
+            Retour à l'accueil
+          </button>
+        </motion.div>
+
         <motion.div
           className="text-center mb-8"
           initial={{ y: -20, opacity: 0 }}
@@ -387,7 +524,6 @@ export default function PanierPage() {
                 </div>
               </motion.div>
 
-              {/* Prescription Upload Section */}
               <motion.div
                 className="bg-white shadow-lg p-6 mt-6"
                 initial={{ scale: 0.95, opacity: 0 }}
@@ -395,15 +531,29 @@ export default function PanierPage() {
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
                 <div className="flex items-center gap-3 mb-6">
-                  <FaUpload className="text-green-600 text-xl" />
-                  <h2 className="text-xl font-bold text-gray-800">Prescription Médicale (Optionnel)</h2>
+                  <FaUpload className="text-red-600 text-xl" />
+                  <h2 className="text-xl font-bold text-gray-800">Prescription Médicale (Obligatoire)</h2>
+                  <span className="text-red-500 text-sm">*</span>
+                </div>
+
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <FaExclamationTriangle className="text-red-600 text-lg mt-0.5" />
+                    <div>
+                      <p className="text-red-800 font-medium">Prescription obligatoire</p>
+                      <p className="text-red-700 text-sm mt-1">
+                        Pour des raisons de sécurité et de conformité réglementaire, une prescription médicale 
+                        valide est obligatoire pour finaliser votre commande.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
                   {/* File Upload */}
                   <div>
                     <label htmlFor="prescription" className="block text-sm font-medium text-gray-700 mb-2">
-                      Télécharger votre prescription
+                      Télécharger votre prescription *
                     </label>
 
                     {!prescriptionData.prescriptionFile ? (
@@ -411,53 +561,119 @@ export default function PanierPage() {
                         <input
                           type="file"
                           id="prescription"
-                          accept="image/*,.pdf"
+                          accept="image/*"
                           onChange={handlePrescriptionFileChange}
                           className="hidden"
                         />
                         <label
                           htmlFor="prescription"
-                          className="flex items-center justify-center w-full px-4 py-8 border-2 border-dashed border-gray-300 hover:border-blue-400 cursor-pointer transition-colors bg-gray-50 hover:bg-blue-50 rounded-lg"
+                          className="flex items-center justify-center w-full px-4 py-8 border-2 border-dashed border-red-300 hover:border-red-400 cursor-pointer transition-colors bg-red-50 hover:bg-red-100 rounded-lg"
                         >
                           <div className="text-center">
-                            <FaUpload className="mx-auto text-3xl text-gray-400 mb-2" />
-                            <p className="text-gray-600">
+                            <FaUpload className="mx-auto text-3xl text-red-400 mb-2" />
+                            <p className="text-red-600 font-medium">
                               Cliquez pour télécharger votre prescription
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              Formats acceptés: JPG, PNG, GIF, PDF (Max: 5MB)
+                            <p className="text-xs text-red-500 mt-1">
+                              Formats acceptés: JPG, PNG, GIF (Max: 5MB)
+                            </p>
+                            <p className="text-xs text-red-600 font-medium mt-2">
+                              ⚠️ Champ obligatoire
                             </p>
                           </div>
                         </label>
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {/* File Info */}
-                        <div className="flex items-center justify-between bg-green-50 p-4 rounded-lg">
+                        {/* File Info with Validation Status */}
+                        <div className={`flex items-center justify-between p-4 rounded-lg border-2 ${
+                          prescriptionValidationStatus === 'validating' ? 'bg-blue-50 border-blue-200' :
+                          prescriptionValidationStatus === 'valid' ? 'bg-green-50 border-green-200' :
+                          prescriptionValidationStatus === 'invalid' ? 'bg-red-50 border-red-200' :
+                          'bg-gray-50 border-gray-200'
+                        }`}>
                           <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                            {prescriptionValidationStatus === 'validating' && (
+                              <FaSpinner className="text-blue-500 animate-spin" />
+                            )}
+                            {prescriptionValidationStatus === 'valid' && (
+                              <FaCheckCircle className="text-green-500" />
+                            )}
+                            {prescriptionValidationStatus === 'invalid' && (
+                              <FaExclamationTriangle className="text-red-500" />
+                            )}
+                            {prescriptionValidationStatus === 'idle' && (
+                              <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                            )}
                             <div>
-                              <p className="text-sm font-medium text-green-700">
+                              <p className={`text-sm font-medium ${
+                                prescriptionValidationStatus === 'valid' ? 'text-green-700' :
+                                prescriptionValidationStatus === 'invalid' ? 'text-red-700' :
+                                prescriptionValidationStatus === 'validating' ? 'text-blue-700' :
+                                'text-gray-700'
+                              }`}>
                                 {prescriptionData.prescriptionFile.name}
                               </p>
-                              <p className="text-xs text-green-600">
-                                {(prescriptionData.prescriptionFile.size / 1024 / 1024).toFixed(2)} MB
+                              <p className={`text-xs ${
+                                prescriptionValidationStatus === 'valid' ? 'text-green-600' :
+                                prescriptionValidationStatus === 'invalid' ? 'text-red-600' :
+                                prescriptionValidationStatus === 'validating' ? 'text-blue-600' :
+                                'text-gray-600'
+                              }`}>
+                                {prescriptionValidationStatus === 'validating' && 'Validation en cours...'}
+                                {prescriptionValidationStatus === 'valid' && '✓ Prescription validée'}
+                                {prescriptionValidationStatus === 'invalid' && '✗ Prescription non valide'}
+                                {prescriptionValidationStatus === 'idle' && `${(prescriptionData.prescriptionFile.size / 1024 / 1024).toFixed(2)} MB`}
                               </p>
                             </div>
                           </div>
                           <button
                             onClick={handleRemoveFile}
-                            className="flex items-center gap-2 px-3 py-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                            className="flex items-center gap-2 px-3 py-1 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
+                            disabled={isValidatingPrescription}
                           >
                             <FaTrash className="text-sm" />
                             <span className="text-sm">Supprimer</span>
                           </button>
                         </div>
 
+                        {/* Validation Message */}
+                        {prescriptionValidationStatus === 'invalid' && (
+                          <div className="bg-red-100 border border-red-300 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                              <FaExclamationTriangle className="text-red-600 text-lg mt-0.5" />
+                              <div>
+                                <p className="text-red-800 font-medium">Prescription non valide</p>
+                                <p className="text-red-700 text-sm mt-1">
+                                  L'image téléchargée ne semble pas être une prescription médicale valide. 
+                                  Assurez-vous que l'image est claire et contient les informations médicales nécessaires.
+                                </p>
+                                <p className="text-red-600 text-xs mt-2">
+                                  Conseils: Vérifiez que l'image est nette, bien éclairée et que le texte est lisible.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {prescriptionValidationStatus === 'validating' && (
+                          <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
+                            <div className="flex items-center gap-3">
+                              <FaSpinner className="text-blue-600 animate-spin" />
+                              <div>
+                                <p className="text-blue-800 font-medium">Validation en cours...</p>
+                                <p className="text-blue-700 text-sm">
+                                  Notre système analyse votre prescription. Veuillez patienter quelques instants.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Image Preview */}
                         {imagePreview && (
                           <div className="border border-gray-200 rounded-lg p-4">
-                            <p className="text-sm font-medium text-gray-700 mb-3">Aperçu de l'image:</p>
+                            <p className="text-sm font-medium text-gray-700 mb-3">Aperçu de la prescription:</p>
                             <div className="relative max-w-md mx-auto">
                               <img
                                 src={imagePreview}
@@ -468,21 +684,11 @@ export default function PanierPage() {
                           </div>
                         )}
 
-                        {/* PDF Preview */}
-                        {prescriptionData.prescriptionFile.type === 'application/pdf' && (
-                          <div className="border border-gray-200 rounded-lg p-4 text-center">
-                            <div className="text-4xl mb-2">📄</div>
-                            <p className="text-sm text-gray-600">
-                              Fichier PDF sélectionné - L'aperçu n'est pas disponible
-                            </p>
-                          </div>
-                        )}
-
                         {/* Replace File Button */}
                         <div className="text-center">
                           <label
                             htmlFor="prescription"
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer transition-colors"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer transition-colors disabled:opacity-50"
                           >
                             <FaUpload />
                             Changer le fichier
@@ -495,8 +701,8 @@ export default function PanierPage() {
                   {/* Clinic Name Input */}
                   <div>
                     <label htmlFor="clinicName" className="block text-sm font-medium text-gray-700 mb-2">
-                      <FaHospital className="inline-block mr-2 text-blue-600" />
-                      Nom de la clinique/centre de santé/hôpital
+                      <FaHospital className="inline-block mr-2 text-red-600" />
+                      Nom de la clinique/centre de santé/hôpital *
                     </label>
                     <input
                       type="text"
@@ -504,14 +710,21 @@ export default function PanierPage() {
                       value={prescriptionData.clinicName}
                       onChange={handleClinicNameChange}
                       placeholder="Ex: Clinique Pasteur, Hôpital Principal de Dakar..."
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-black ${
+                        !prescriptionData.clinicName.trim() ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
+                      required
                     />
+                    {!prescriptionData.clinicName.trim() && (
+                      <p className="text-red-600 text-xs mt-1">⚠️ Ce champ est obligatoire</p>
+                    )}
                   </div>
 
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <p className="text-sm text-blue-700">
-                      <strong>Note:</strong> Le téléchargement d'une prescription médicale est optionnel mais recommandé
-                      pour les médicaments sur ordonnance. Cela nous aide à mieux traiter votre commande.
+                      <strong>Validation automatique:</strong> Notre système utilise la reconnaissance de texte (OCR) 
+                      pour vérifier que votre document est bien une prescription médicale valide. 
+                      Assurez-vous que l'image est claire et lisible.
                     </p>
                   </div>
                 </div>
@@ -552,12 +765,38 @@ export default function PanierPage() {
 
                 <motion.button
                   onClick={handleCommander}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 font-semibold transition-colors shadow-lg"
+                  whileHover={{ scale: prescriptionData.isValidated && prescriptionData.clinicName.trim() ? 1.02 : 1 }}
+                  whileTap={{ scale: prescriptionData.isValidated && prescriptionData.clinicName.trim() ? 0.98 : 1 }}
+                  disabled={!prescriptionData.isValidated || !prescriptionData.clinicName.trim() || isValidatingPrescription}
+                  className={`w-full mt-6 py-3 px-6 font-semibold transition-colors shadow-lg ${
+                    prescriptionData.isValidated && prescriptionData.clinicName.trim() && !isValidatingPrescription
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
+                      : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  }`}
                 >
-                  Passer commande
+                  {isValidatingPrescription ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <FaSpinner className="animate-spin" />
+                      Validation en cours...
+                    </div>
+                  ) : !prescriptionData.prescriptionFile ? (
+                    'Prescription requise'
+                  ) : !prescriptionData.isValidated ? (
+                    'Prescription non validée'
+                  ) : !prescriptionData.clinicName.trim() ? (
+                    'Nom établissement requis'
+                  ) : (
+                    'Passer commande'
+                  )}
                 </motion.button>
+
+                {(!prescriptionData.isValidated || !prescriptionData.clinicName.trim()) && (
+                  <div className="mt-3 text-center">
+                    <p className="text-red-600 text-sm">
+                      ⚠️ Une prescription validée et le nom de l'établissement sont obligatoires
+                    </p>
+                  </div>
+                )}
 
                 <div className="mt-4 text-center">
                   <button
@@ -618,19 +857,26 @@ export default function PanierPage() {
                 {(prescriptionData.prescriptionFile || prescriptionData.clinicName) && (
                   <div className="mt-6">
                     <h4 className="text-lg font-bold text-gray-800 mb-3">Prescription</h4>
-                    <div className="bg-green-50 p-4 rounded-lg space-y-2">
+                    <div className={`p-4 rounded-lg space-y-2 ${
+                      prescriptionData.isValidated ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                    }`}>
                       {prescriptionData.prescriptionFile && (
                         <div className="flex items-center gap-2">
-                          <FaUpload className="text-green-600" />
-                          <span className="text-sm text-green-700">
+                          {prescriptionData.isValidated ? (
+                            <FaCheckCircle className="text-green-600" />
+                          ) : (
+                            <FaExclamationTriangle className="text-red-600" />
+                          )}
+                          <span className={`text-sm ${prescriptionData.isValidated ? 'text-green-700' : 'text-red-700'}`}>
                             Fichier: {prescriptionData.prescriptionFile.name}
+                            {prescriptionData.isValidated ? ' (Validée)' : ' (Non validée)'}
                           </span>
                         </div>
                       )}
                       {prescriptionData.clinicName && (
                         <div className="flex items-center gap-2">
-                          <FaHospital className="text-green-600" />
-                          <span className="text-sm text-green-700">
+                          <FaHospital className={prescriptionData.isValidated ? 'text-green-600' : 'text-red-600'} />
+                          <span className={`text-sm ${prescriptionData.isValidated ? 'text-green-700' : 'text-red-700'}`}>
                             Établissement: {prescriptionData.clinicName}
                           </span>
                         </div>
